@@ -1,9 +1,7 @@
 export interface NewsSource {
-  type: 'reddit' | 'rss';
   name: string;
-  url?: string;
-  subreddit?: string;
   icon?: string;
+  type: 'rss' | 'reddit';
 }
 
 export interface NewsItem {
@@ -11,22 +9,16 @@ export interface NewsItem {
   title: string;
   url: string;
   source: NewsSource;
-  timestamp: Date;
+  publishedAt: Date;
+  imageUrl?: string;
   domain?: string;
   score?: number;
-  summary?: string;
-  imageUrl?: string;
-  aiExplanation?: {
-    what: string;
-    why: string;
-    impact: string;
-  };
+  commentCount?: number;
 }
 
 export interface FilterConfig {
-  requireExternalLinks: boolean;
-  allowedDomains: string[];
-  deprioritizeOneLiners: boolean;
-  deprioritizeLoadedLanguage: boolean;
-  questionHeavyTitles: boolean;
+  requireExternalLink?: boolean;
+  requireNewsDomain?: boolean;
+  deprioritizeOneLiners?: boolean;
+  minScore?: number;
 }

@@ -1,5 +1,8 @@
-import { FilterConfig, NewsItem } from '@/types/news';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { Platform } from 'react-native';
+
+import { FilterConfig, NewsItem, NewsSource } from '@/types/news';
 
 const RSS_FEEDS = [
   { 
@@ -20,6 +23,12 @@ const RSS_FEEDS = [
     icon: 'https://arstechnica.com/favicon.ico',
     fallbackImage: 'https://cdn.arstechnica.net/wp-content/uploads/2016/10/cropped-ars-logo-512_480-270x270.png'
   },
+  { 
+    name: 'TechCrunch', 
+    url: 'https://techcrunch.com/feed/',
+    icon: 'https://techcrunch.com/wp-content/uploads/2015/02/cropped-cropped-favicon-gradient.png',
+    fallbackImage: 'https://techcrunch.com/wp-content/uploads/2015/02/cropped-cropped-favicon-gradient.png'
+  },
 ];
 
 const REDDIT_SUBREDDITS = [
@@ -38,232 +47,387 @@ const NEWS_DOMAINS = [
   'npr.org',
   'bbc.com',
   'bbc.co.uk',
-  //'theguardian.com',
   'nytimes.com',
   'washingtonpost.com',
   'arstechnica.com',
+  'techcrunch.com',
+  'news.ycombinator.com',
+  'cbc.ca',
+  'huffpost.com'
 ];
 
-// Decode HTML entities
-function decodeHTMLEntities(text: string): string {
-  const entities: { [key: string]: string } = {
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&quot;': '"',
-    '&apos;': "'",
-    '&#39;': "'",
-    '&#x27;': "'",
-    '&nbsp;': ' ',
-    '&#8217;': "'",
-    '&#8216;': "'",
-    '&#8220;': '"',
-    '&#8221;': '"',
+export class NewsService {
+  private readonly CACHE_KEY = '@lightbulb_news_cache';
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  private readonly defaultFilter: FilterConfig = {
+    requireExternalLink: true,
+    requireNewsDomain: true,
+    deprioritizeOneLiners: true,
+    minScore: 10,
   };
 
-  return text.replace(/&[#\w]+;/g, (entity) => entities[entity] || entity);
-}
+  private getCorsProxyUrl(url: string): string {
+    // Only use CORS proxy on web platform
+    if (Platform.OS === 'web') {
+      return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  }
 
-// Extract image from RSS item
-function extractImageFromRSS(itemContent: string): string | undefined {
-  // Try to find media:content
-  const mediaContentMatch = itemContent.match(/<media:content[^>]*url=["']([^"']+)["']/i);
-  if (mediaContentMatch) return mediaContentMatch[1];
+  private getHeaders(isRSS: boolean = false): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Accept': isRSS 
+        ? 'application/rss+xml, application/xml, text/xml, */*'
+        : 'application/json',
+    };
 
-  // Try to find media:thumbnail
-  const mediaThumbnailMatch = itemContent.match(/<media:thumbnail[^>]*url=["']([^"']+)["']/i);
-  if (mediaThumbnailMatch) return mediaThumbnailMatch[1];
+    // Only set User-Agent on native platforms (not web)
+    if (Platform.OS !== 'web') {
+      headers['User-Agent'] = 'Lightbulb News App/1.0';
+    }
 
-  // Try to find enclosure
-  const enclosureMatch = itemContent.match(/<enclosure[^>]*url=["']([^"']+)["'][^>]*type=["']image/i);
-  if (enclosureMatch) return enclosureMatch[1];
+    return headers;
+  }
 
-  // Try to find img tag in description
-  const imgMatch = itemContent.match(/<img[^>]*src=["']([^"']+)["']/i);
-  if (imgMatch) return imgMatch[1];
-
-  return undefined;
-}
-
-// Simple RSS parser for React Native
-function parseRSS(xmlString: string): { title: string; link: string; pubDate?: string; image?: string }[] {
-  const items: { title: string; link: string; pubDate?: string; image?: string }[] = [];
-  
-  // Match all <item> tags
-  const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/gi;
-  const itemMatches = xmlString.matchAll(itemRegex);
-  
-  for (const itemMatch of itemMatches) {
-    const itemContent = itemMatch[1];
+  private parseRSSFeed(xmlText: string, feedConfig: typeof RSS_FEEDS[0]): NewsItem[] {
+    const items: NewsItem[] = [];
     
-    // Extract title
-    const titleMatch = itemContent.match(/<title[^>]*><!\[CDATA\[(.*?)\]\]><\/title>|<title[^>]*>(.*?)<\/title>/i);
-    const rawTitle = titleMatch ? (titleMatch[1] || titleMatch[2] || '').trim() : '';
-    const title = decodeHTMLEntities(rawTitle);
-    
-    // Extract link
-    const linkMatch = itemContent.match(/<link[^>]*>(.*?)<\/link>/i);
-    const link = linkMatch ? linkMatch[1].trim() : '';
-    
-    // Extract pubDate
-    const pubDateMatch = itemContent.match(/<pubDate[^>]*>(.*?)<\/pubDate>/i);
-    const pubDate = pubDateMatch ? pubDateMatch[1].trim() : undefined;
+    try {
+      const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+      const matches = xmlText.matchAll(itemRegex);
+      
+      for (const match of matches) {
+        const itemXml = match[1];
+        
+        const title = this.extractXMLTag(itemXml, 'title');
+        const link = this.extractXMLTag(itemXml, 'link');
+        const pubDate = this.extractXMLTag(itemXml, 'pubDate');
+        const description = this.extractXMLTag(itemXml, 'description');
+        
+        let imageUrl = this.extractXMLAttribute(itemXml, 'media:thumbnail', 'url') || 
+                       this.extractXMLAttribute(itemXml, 'media:content', 'url');
+        
+        if (!imageUrl && description) {
+          const imgMatch = description.match(/<img[^>]+src="([^">]+)"/);
+          if (imgMatch) {
+            imageUrl = imgMatch[1];
+          }
+        }
 
-    // Extract image
-    const image = extractImageFromRSS(itemContent);
+        if (!imageUrl) {
+          imageUrl = feedConfig.fallbackImage;
+        }
+        
+        if (title && link) {
+          items.push({
+            id: `rss-${feedConfig.name}-${link}`,
+            title: this.cleanHTML(title),
+            url: link,
+            source: {
+              name: feedConfig.name,
+              icon: feedConfig.icon,
+              type: 'rss',
+            },
+            publishedAt: pubDate ? new Date(pubDate) : new Date(),
+            imageUrl: imageUrl || undefined,
+            domain: this.extractDomain(link),
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`Error parsing RSS feed for ${feedConfig.name}:`, error);
+    }
     
-    if (title && link) {
-      items.push({ title, link, pubDate, image });
+    return items;
+  }
+
+  private extractXMLTag(xml: string, tag: string): string {
+    const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`, 'i');
+    const match = xml.match(regex);
+    return match ? match[1].trim() : '';
+  }
+
+  private extractXMLAttribute(xml: string, tag: string, attribute: string): string {
+    const regex = new RegExp(`<${tag}[^>]*${attribute}="([^"]+)"`, 'i');
+    const match = xml.match(regex);
+    return match ? match[1] : '';
+  }
+
+  private cleanHTML(text: string): string {
+    return text
+      .replace(/<[^>]*>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#x27;/g, "'")
+      .replace(/&rsquo;/g, "'")
+      .replace(/&lsquo;/g, "'")
+      .replace(/&rdquo;/g, '"')
+      .replace(/&ldquo;/g, '"')
+      .replace(/&mdash;/g, '—')
+      .replace(/&ndash;/g, '–')
+      .trim();
+  }
+
+  private extractDomain(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname.replace('www.', '');
+    } catch {
+      return '';
     }
   }
-  
-  return items;
-}
 
-export class NewsService {
-  private filterConfig: FilterConfig = {
-    requireExternalLinks: true,
-    allowedDomains: NEWS_DOMAINS,
-    deprioritizeOneLiners: true,
-    deprioritizeLoadedLanguage: true,
-    questionHeavyTitles: false,
-  };
+  private async fetchRSSNews(): Promise<NewsItem[]> {
+    const allItems: NewsItem[] = [];
 
-  async fetchRedditPosts(subreddit: string): Promise<NewsItem[]> {
-    try {
-      const response = await axios.get(
-        `https://www.reddit.com/r/${subreddit}/hot.json?limit=25`,
-        {
-          headers: {
-            'User-Agent': 'Lightbulb/1.0',
-          },
-          timeout: 10000,
-        }
-      );
-      
-      const posts = response.data.data.children.map((child: any) => {
-        let imageUrl: string | undefined;
+    console.log('🔄 Starting RSS feed fetch... Platform:', Platform.OS);
+
+    for (const feed of RSS_FEEDS) {
+      try {
+        const feedUrl = this.getCorsProxyUrl(feed.url);
+        console.log(`📡 Fetching RSS feed: ${feed.name}`);
         
-        // Try to get preview image
-        if (child.data.preview?.images?.[0]?.source?.url) {
-          imageUrl = child.data.preview.images[0].source.url.replace(/&amp;/g, '&');
-        } else if (child.data.thumbnail && child.data.thumbnail.startsWith('http')) {
-          imageUrl = child.data.thumbnail;
-        }
+        const response = await axios.get(feedUrl, {
+          timeout: 15000,
+          headers: this.getHeaders(true),
+        });
 
-        // Use Reddit logo as fallback
-        if (!imageUrl) {
-          imageUrl = 'https://www.redditinc.com/assets/images/site/reddit-logo.png';
+        console.log(`✅ Got response from ${feed.name}, status: ${response.status}, length: ${response.data.length}`);
+        const items = this.parseRSSFeed(response.data, feed);
+        console.log(`📰 Parsed ${items.length} items from ${feed.name}`);
+        
+        if (items.length > 0) {
+          console.log(`   Sample: "${items[0].title}"`);
+        } else {
+          console.log(`   ⚠️ No items parsed! Response preview:`, response.data.substring(0, 200));
         }
+        
+        allItems.push(...items);
+      } catch (error: any) {
+        console.error(`❌ Error fetching RSS feed ${feed.name}:`, {
+          message: error.message,
+          code: error.code,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+        });
+      }
+    }
 
-        return {
-          id: child.data.id,
-          title: decodeHTMLEntities(child.data.title),
-          url: child.data.url,
-          source: {
-            type: 'reddit' as const,
-            name: `r/${subreddit}`,
-            subreddit,
-            icon: 'https://www.reddit.com/favicon.ico',
-          },
-          timestamp: new Date(child.data.created_utc * 1000),
-          domain: child.data.domain,
-          score: child.data.score,
-          imageUrl,
-        };
+    console.log(`📊 Total RSS items fetched: ${allItems.length}`);
+    return allItems;
+  }
+
+  private async fetchRedditNews(): Promise<NewsItem[]> {
+    const allPosts: NewsItem[] = [];
+
+    for (const subreddit of REDDIT_SUBREDDITS) {
+      try {
+        console.log(`Fetching r/${subreddit}`);
+        
+        // Use CORS proxy on web platform
+        const redditUrl = `https://www.reddit.com/r/${subreddit}/hot.json?limit=25`;
+        const url = this.getCorsProxyUrl(redditUrl);
+        
+        const response = await axios.get(url, {
+          timeout: 10000,
+          headers: this.getHeaders(false),
+        });
+
+        const posts = response.data.data.children
+          .map((child: any) => child.data)
+          .filter((post: any) => !post.stickied && !post.over_18)
+          .map((post: any) => {
+            const domain = this.extractDomain(post.url);
+            
+            return {
+              id: post.id,
+              title: post.title,
+              url: post.url,
+              score: post.score,
+              source: {
+                name: `r/${subreddit}`,
+                icon: 'https://www.redditstatic.com/desktop2x/img/favicon/favicon-32x32.png',
+                type: 'reddit',
+              } as NewsSource,
+              publishedAt: new Date(post.created_utc * 1000),
+              imageUrl: this.getRedditImage(post),
+              domain,
+              commentCount: post.num_comments,
+            } as NewsItem;
+          });
+
+        console.log(`✅ Fetched ${posts.length} posts from r/${subreddit}`);
+        allPosts.push(...posts);
+      } catch (error) {
+        console.error(`Error fetching r/${subreddit}:`, error);
+      }
+    }
+
+    console.log(`🔴 Total Reddit posts fetched: ${allPosts.length}`);
+    return allPosts;
+  }
+
+  private getRedditImage(post: any): string | undefined {
+    if (post.preview?.images?.[0]?.source?.url) {
+      return post.preview.images[0].source.url.replace(/&amp;/g, '&');
+    }
+    
+    if (post.thumbnail && 
+        post.thumbnail.startsWith('http') && 
+        !post.thumbnail.includes('reddit.com')) {
+      return post.thumbnail;
+    }
+    
+    if (post.url && /\.(jpg|jpeg|png|gif|webp)$/i.test(post.url)) {
+      return post.url;
+    }
+
+    return undefined;
+  }
+
+  private filterPosts(posts: NewsItem[], config: FilterConfig = this.defaultFilter): NewsItem[] {
+    return posts.filter(post => {
+      // RSS feeds bypass filtering - they're already curated
+      if (post.source.type === 'rss') {
+        return true;
+      }
+
+      // Check external link requirement
+      if (config.requireExternalLink && !post.url.startsWith('http')) {
+        return false;
+      }
+
+      // Check news domain requirement
+      if (config.requireNewsDomain && post.domain) {
+        const isNewsDomain = NEWS_DOMAINS.some(domain => 
+          post.domain?.includes(domain)
+        );
+        if (!isNewsDomain) {
+          return false;
+        }
+      }
+
+      // Check minimum score (use default if not specified)
+      const minScoreThreshold = config.minScore ?? this.defaultFilter.minScore ?? 10;
+      if (post.score !== undefined && post.score < minScoreThreshold) {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  private sortPosts(posts: NewsItem[], config: FilterConfig = this.defaultFilter): NewsItem[] {
+    return posts.sort((a, b) => {
+      if (config.deprioritizeOneLiners) {
+        const aIsOneLiner = a.title.length < 100;
+        const bIsOneLiner = b.title.length < 100;
+        
+        if (aIsOneLiner && !bIsOneLiner) return 1;
+        if (!aIsOneLiner && bIsOneLiner) return -1;
+      }
+
+      return b.publishedAt.getTime() - a.publishedAt.getTime();
+    });
+  }
+
+  async fetchAllNews(config?: FilterConfig): Promise<NewsItem[]> {
+    try {
+      const cached = await this.getCachedNews();
+      if (cached) {
+        console.log('Using cached news data');
+        return cached;
+      }
+
+      console.log('Fetching fresh news data...');
+      
+      const [rssNews, redditNews] = await Promise.all([
+        this.fetchRSSNews(),
+        this.fetchRedditNews(),
+      ]);
+
+      console.log(`📊 Fetched ${rssNews.length} RSS items and ${redditNews.length} Reddit items`);
+      
+      // Debug: Count by source BEFORE filtering
+      const rssBySource: Record<string, number> = {};
+      rssNews.forEach(item => {
+        rssBySource[item.source.name] = (rssBySource[item.source.name] || 0) + 1;
       });
+      console.log('📰 RSS items by source:', rssBySource);
 
-      return posts;
+      const redditBySource: Record<string, number> = {};
+      redditNews.forEach(item => {
+        redditBySource[item.source.name] = (redditBySource[item.source.name] || 0) + 1;
+      });
+      console.log('🔴 Reddit items by source (BEFORE filter):', redditBySource);
+
+      const allNews = [...rssNews, ...redditNews];
+      const filtered = this.filterPosts(allNews, config);
+      
+      // Debug: Count AFTER filtering
+      const filteredBySource: Record<string, number> = {};
+      filtered.forEach(item => {
+        filteredBySource[item.source.name] = (filteredBySource[item.source.name] || 0) + 1;
+      });
+      console.log('✅ Items by source (AFTER filter):', filteredBySource);
+      
+      const sorted = this.sortPosts(filtered, config);
+
+      await this.cacheNews(sorted);
+
+      console.log(`✅ Final: ${sorted.length} news items`);
+      return sorted;
     } catch (error) {
-      console.error(`Error fetching r/${subreddit}:`, error);
+      console.error('Error fetching news:', error);
       return [];
     }
   }
 
-  async fetchRSSFeed(feed: { name: string; url: string; icon: string; fallbackImage: string }): Promise<NewsItem[]> {
+  private async getCachedNews(): Promise<NewsItem[] | null> {
     try {
-      const response = await axios.get(feed.url, {
-        headers: {
-          'User-Agent': 'Lightbulb/1.0',
-        },
-        timeout: 15000,
-      });
-      
-      const items = parseRSS(response.data);
-      
-      return items.map((item, index) => ({
-        id: `${feed.name}-${index}-${Date.now()}`,
-        title: item.title,
-        url: item.link,
-        source: {
-          type: 'rss' as const,
-          name: feed.name,
-          url: feed.url,
-          icon: feed.icon,
-        },
-        timestamp: item.pubDate ? new Date(item.pubDate) : new Date(),
-        imageUrl: item.image || feed.fallbackImage,
+      const cached = await AsyncStorage.getItem(this.CACHE_KEY);
+      if (!cached) return null;
+
+      const { data, timestamp } = JSON.parse(cached);
+      const age = Date.now() - timestamp;
+
+      if (age > this.CACHE_DURATION) {
+        await AsyncStorage.removeItem(this.CACHE_KEY);
+        return null;
+      }
+
+      return data.map((item: any) => ({
+        ...item,
+        publishedAt: new Date(item.publishedAt),
       }));
     } catch (error) {
-      console.error(`Error fetching RSS feed ${feed.name}:`, error);
-      return [];
+      console.error('Error reading cache:', error);
+      return null;
     }
   }
 
-  async fetchAllNews(): Promise<NewsItem[]> {
-    const redditPromises = REDDIT_SUBREDDITS.map((sub) =>
-      this.fetchRedditPosts(sub)
-    );
-    const rssPromises = RSS_FEEDS.map((feed) => this.fetchRSSFeed(feed));
-
-    const allResults = await Promise.all([...redditPromises, ...rssPromises]);
-    const allNews = allResults.flat();
-
-    return this.filterNews(allNews);
+  private async cacheNews(news: NewsItem[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        this.CACHE_KEY,
+        JSON.stringify({
+          data: news,
+          timestamp: Date.now(),
+        })
+      );
+    } catch (error) {
+      console.error('Error caching news:', error);
+    }
   }
 
-  private filterNews(items: NewsItem[]): NewsItem[] {
-    return items
-      .filter((item) => {
-        // Filter external links
-        if (this.filterConfig.requireExternalLinks && item.source.type === 'reddit') {
-          return !item.domain?.includes('reddit.com');
-        }
-        return true;
-      })
-      .filter((item) => {
-        // Filter by news domains (relaxed for RSS feeds)
-        if (item.source.type === 'rss') {
-          return true;
-        }
-        if (item.domain) {
-          return this.filterConfig.allowedDomains.some((domain) =>
-            item.domain?.includes(domain)
-          );
-        }
-        return true;
-      })
-      .filter((item) => {
-        // Filter question-heavy titles
-        if (this.filterConfig.questionHeavyTitles) {
-          const questionWords = ['what', 'why', 'how', 'when', 'who', 'where', '?'];
-          const titleLower = item.title.toLowerCase();
-          return questionWords.some((word) => titleLower.includes(word));
-        }
-        return true;
-      })
-      .sort((a, b) => {
-        // Deprioritize one-liners
-        if (this.filterConfig.deprioritizeOneLiners) {
-          const aIsOneLiner = a.title.split(' ').length < 5;
-          const bIsOneLiner = b.title.split(' ').length < 5;
-          if (aIsOneLiner && !bIsOneLiner) return 1;
-          if (!aIsOneLiner && bIsOneLiner) return -1;
-        }
-
-        // Sort by timestamp
-        return b.timestamp.getTime() - a.timestamp.getTime();
-      });
+  async clearCache(): Promise<void> {
+    await AsyncStorage.removeItem(this.CACHE_KEY);
   }
 }
 
