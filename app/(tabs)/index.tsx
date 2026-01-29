@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { aiService } from '@/services/aiService';
 import { newsService } from '@/services/newsService';
 import { NewsItem } from '@/types/news';
 
@@ -46,17 +47,14 @@ export default function HomeScreen() {
     setIlluminateLoading(true);
     setExplanation(null);
 
-    // TODO: Call AI service here
-    // For now, using mock data
-    setTimeout(() => {
-      setExplanation({
-        summary: 'This is a placeholder summary of the article. It will be replaced with AI-generated content that provides a concise overview of what the article is about.',
-        why: 'This is a placeholder explanation of why this is happening. The AI will provide context and background information about the events or trends described in the article.',
-        impact: 'This is a placeholder for how this affects you. The AI will explain the potential consequences and relevance of this news to the reader\'s daily life.',
-        credibility: 'This is a placeholder for source credibility analysis. The AI will assess the reliability of the source and any potential biases.',
-      });
+    try {
+      const result = await aiService.explainNews(item);
+      setExplanation(result);
+    } catch (error) {
+      console.error('Error getting AI explanation:', error);
+    } finally {
       setIlluminateLoading(false);
-    }, 2000);
+    }
   };
 
   const handleCloseModal = () => {
