@@ -62,6 +62,40 @@ export class NewsService {
     return allPosts;
   }
 
+  private deduplicatePosts(posts: NewsItem[]): NewsItem[] {
+    const seen = new Map<string, NewsItem>();
+    
+    for (const post of posts) {
+      const existing = seen.get(post.url);
+      
+      if (!existing) {
+        // First time seeing this URL
+        seen.set(post.url, post);
+      } else {
+        // Duplicate found - keep the one with higher score or from better source
+        if (post.source.type === 'rss' && existing.source.type === 'reddit') {
+          // Prefer RSS feeds over Reddit
+          seen.set(post.url, post);
+        } else if (post.source.type === 'reddit' && existing.source.type === 'reddit') {
+          // Both Reddit - keep the one with higher score
+          if ((post.score || 0) > (existing.score || 0)) {
+            seen.set(post.url, post);
+          }
+        }
+        // If existing is RSS and new is Reddit, keep existing (RSS preferred)
+      }
+    }
+    
+    const uniquePosts = Array.from(seen.values());
+    const duplicateCount = posts.length - uniquePosts.length;
+    
+    if (duplicateCount > 0) {
+      logger.info(`Removed ${duplicateCount} duplicate articles`);
+    }
+    
+    return uniquePosts;
+  }
+
   private filterPosts(posts: NewsItem[], config: FilterConfig = DEFAULT_FILTER_CONFIG): NewsItem[] {
     return posts.filter(post => {
       if (post.source.type === 'rss') return true;
@@ -116,12 +150,13 @@ export class NewsService {
       ]);
 
       const allNews = [...rssNews, ...redditNews];
-      const filtered = this.filterPosts(allNews, config);
+      const deduplicated = this.deduplicatePosts(allNews);
+      const filtered = this.filterPosts(deduplicated, config);
       const sorted = this.sortPosts(filtered, config);
 
       await this.cacheNews(sorted);
 
-      logger.success(`Fetched ${sorted.length} news items (${rssNews.length} RSS, ${redditNews.length} Reddit)`);
+      logger.success(`Fetched ${sorted.length} news items (${rssNews.length} RSS, ${redditNews.length} Reddit, removed ${allNews.length - deduplicated.length} duplicates)`);
       return sorted;
     } catch (error) {
       logger.error('Error fetching news:', error);

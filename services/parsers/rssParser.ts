@@ -24,10 +24,18 @@ export class RSSParser {
   }
 
   private parseItem(itemXml: string, feedConfig: typeof RSS_FEEDS[number]): NewsItem | null {
-    const title = extractXMLTag(itemXml, 'title');
+    let title = extractXMLTag(itemXml, 'title');
     const link = extractXMLTag(itemXml, 'link');
     const pubDate = extractXMLTag(itemXml, 'pubDate');
     const description = extractXMLTag(itemXml, 'description');
+    
+    // Handle CDATA in title (common in BBC and other feeds)
+    if (title.includes('<![CDATA[')) {
+      const cdataMatch = title.match(/<!\[CDATA\[(.*?)\]\]>/);
+      if (cdataMatch) {
+        title = cdataMatch[1];
+      }
+    }
     
     if (!title || !link) {
       return null;
@@ -56,10 +64,20 @@ export class RSSParser {
     feedConfig: typeof RSS_FEEDS[number]
   ): string | undefined {
     let imageUrl = extractXMLAttribute(itemXml, 'media:thumbnail', 'url') || 
-                   extractXMLAttribute(itemXml, 'media:content', 'url');
+                   extractXMLAttribute(itemXml, 'media:content', 'url') ||
+                   extractXMLAttribute(itemXml, 'enclosure', 'url');
     
-    if (!imageUrl && description) {
-      const imgMatch = description.match(/<img[^>]+src="([^">]+)"/);
+    // Handle CDATA in description
+    let cleanDescription = description;
+    if (description.includes('<![CDATA[')) {
+      const cdataMatch = description.match(/<!\[CDATA\[(.*?)\]\]>/s);
+      if (cdataMatch) {
+        cleanDescription = cdataMatch[1];
+      }
+    }
+    
+    if (!imageUrl && cleanDescription) {
+      const imgMatch = cleanDescription.match(/<img[^>]+src="([^">]+)"/);
       if (imgMatch) {
         imageUrl = imgMatch[1];
       }

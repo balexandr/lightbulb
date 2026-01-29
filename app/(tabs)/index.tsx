@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { FilterMenu } from '@/components/FilterMenu';
 import { IlluminateModal } from '@/components/IlluminateModal';
@@ -82,6 +82,19 @@ export default function HomeScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     loadNews(true);
+  };
+
+  const handleOpenArticle = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        logger.error('Cannot open URL:', url);
+      }
+    } catch (error) {
+      logger.error('Error opening URL:', error);
+    }
   };
 
   const handleIlluminate = async (item: NewsItem) => {
@@ -188,17 +201,21 @@ export default function HomeScreen() {
         }
         renderItem={({ item }) => (
           <ThemedView style={styles.card}>
-            <ThemedText type="defaultSemiBold" numberOfLines={3}>
-              {item.title}
-            </ThemedText>
+            <TouchableOpacity onPress={() => handleOpenArticle(item.url)}>
+              <ThemedText type="defaultSemiBold" numberOfLines={3} style={styles.titleLink}>
+                {item.title}
+              </ThemedText>
+            </TouchableOpacity>
             {item.imageUrl && (
-              <View style={styles.imageContainer}>
-                <Image 
-                  source={{ uri: item.imageUrl }}
-                  style={styles.articleImage}
-                  resizeMode="cover"
-                />
-              </View>
+              <TouchableOpacity onPress={() => handleOpenArticle(item.url)}>
+                <View style={styles.imageContainer}>
+                  <Image 
+                    source={{ uri: item.imageUrl }}
+                    style={styles.articleImage}
+                    resizeMode="cover"
+                  />
+                </View>
+              </TouchableOpacity>
             )}
             <ThemedView style={styles.metadata}>
               <View style={styles.sourceContainer}>
@@ -328,6 +345,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  titleLink: {
+    marginBottom: 4,
   },
   imageContainer: {
     backgroundColor: '#f0f0f0',
