@@ -23,7 +23,12 @@ export class CacheService {
       if (!indexStr) {
         return { keys: [], lastCleanup: Date.now() };
       }
-      return JSON.parse(indexStr);
+      const parsed = JSON.parse(indexStr);
+      // Ensure keys is always an array
+      if (!parsed.keys || !Array.isArray(parsed.keys)) {
+        return { keys: [], lastCleanup: Date.now() };
+      }
+      return parsed;
     } catch (error) {
       logger.error('Error reading cache index:', error);
       return { keys: [], lastCleanup: Date.now() };
@@ -32,6 +37,10 @@ export class CacheService {
 
   private async updateIndex(index: CacheIndex): Promise<void> {
     try {
+      // Ensure keys is an array before saving
+      if (!Array.isArray(index.keys)) {
+        index.keys = [];
+      }
       await AsyncStorage.setItem(CACHE_CONFIG.INDEX_KEY, JSON.stringify(index));
     } catch (error) {
       logger.error('Error updating cache index:', error);
@@ -61,7 +70,6 @@ export class CacheService {
         return null;
       }
 
-      logger.info('Retrieved explanation from cache');
       return explanation;
     } catch (error) {
       logger.error('Error reading explanation cache:', error);
@@ -81,12 +89,16 @@ export class CacheService {
       await AsyncStorage.setItem(key, JSON.stringify(cached));
 
       const index = await this.getIndex();
+      // Double-check keys is an array
+      if (!Array.isArray(index.keys)) {
+        index.keys = [];
+      }
       if (!index.keys.includes(key)) {
         index.keys.push(key);
         await this.updateIndex(index);
       }
 
-      logger.info('Cached explanation');
+      logger.success('Cached explanation');
     } catch (error) {
       logger.error('Error caching explanation:', error);
     }
@@ -97,7 +109,7 @@ export class CacheService {
       const index = await this.getIndex();
       let oldestTimestamp: number | null = null;
 
-      for (const key of index.keys) {
+      for (const key of index.keys || []) {
         const cached = await AsyncStorage.getItem(key);
         if (cached) {
           const { timestamp } = JSON.parse(cached);
@@ -112,7 +124,7 @@ export class CacheService {
         : null;
 
       return {
-        count: index.keys.length,
+        count: (index.keys || []).length,
         oldestAge,
       };
     } catch (error) {
@@ -127,7 +139,7 @@ export class CacheService {
       const maxAge = CACHE_CONFIG.EXPLANATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
       const validKeys: string[] = [];
 
-      for (const key of index.keys) {
+      for (const key of index.keys || []) {
         const cached = await AsyncStorage.getItem(key);
         if (cached) {
           const { timestamp } = JSON.parse(cached);
@@ -141,11 +153,14 @@ export class CacheService {
         }
       }
 
+      const removedCount = (index.keys || []).length - validKeys.length;
       index.keys = validKeys;
       index.lastCleanup = Date.now();
       await this.updateIndex(index);
 
-      logger.info(`Cleared ${index.keys.length - validKeys.length} expired cache entries`);
+      if (removedCount > 0) {
+        logger.info(`Cleared ${removedCount} expired cache entries`);
+      }
     } catch (error) {
       logger.error('Error clearing expired cache:', error);
     }
@@ -155,7 +170,7 @@ export class CacheService {
     try {
       const index = await this.getIndex();
       
-      for (const key of index.keys) {
+      for (const key of index.keys || []) {
         await AsyncStorage.removeItem(key);
       }
 

@@ -36,14 +36,22 @@ class AIService {
   }
 
   async explainNews(item: NewsItem): Promise<AIExplanation> {
+    // Check cache first
+    logger.debug('Checking cache for', item.url);
     const cached = await cacheService.getExplanation(item);
     if (cached) {
+      logger.success('Using cached explanation');
       return cached;
     }
+    
+    logger.info('No cache found, generating new explanation');
 
     if (!this.openai) {
       logger.info('Using mock explanation (no API key)');
-      return this.getMockExplanation(item);
+      const mockExplanation = this.getMockExplanation(item);
+      // Cache the mock explanation too
+      await cacheService.setExplanation(item, mockExplanation);
+      return mockExplanation;
     }
 
     try {
@@ -87,10 +95,19 @@ Format as JSON with keys: summary, why, impact, credibility`;
       const explanation = JSON.parse(content);
       await cacheService.setExplanation(item, explanation);
       
+      logger.success('Generated and cached new explanation');
       return explanation;
     } catch (error: any) {
-      logger.error('Error calling OpenAI:', error.message);
-      return this.getMockExplanation(item);
+      // Only log if it's not a quota error
+      if (!error.message?.includes('quota')) {
+        logger.error('Error calling OpenAI:', error.message);
+      } else {
+        logger.info('OpenAI quota exceeded, using mock data');
+      }
+      const mockExplanation = this.getMockExplanation(item);
+      // Cache the mock explanation so we don't keep hitting the API
+      await cacheService.setExplanation(item, mockExplanation);
+      return mockExplanation;
     }
   }
 
