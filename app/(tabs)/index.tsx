@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { aiService } from '@/services/aiService';
+import { cacheService } from '@/services/cacheService';
 import { newsService } from '@/services/newsService';
 import { NewsItem } from '@/types/news';
 
@@ -18,6 +19,7 @@ export default function HomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [illuminateLoading, setIlluminateLoading] = useState(false);
   const [explanation, setExplanation] = useState<any>(null);
+  const [fromCache, setFromCache] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
 
   const loadNews = async () => {
@@ -46,8 +48,15 @@ export default function HomeScreen() {
     setModalVisible(true);
     setIlluminateLoading(true);
     setExplanation(null);
+    setFromCache(false);
 
     try {
+      // Check if we have it cached
+      const cached = await cacheService.getExplanation(item);
+      if (cached) {
+        setFromCache(true);
+      }
+      
       const result = await aiService.explainNews(item);
       setExplanation(result);
     } catch (error) {
@@ -61,6 +70,7 @@ export default function HomeScreen() {
     setModalVisible(false);
     setSelectedItem(null);
     setExplanation(null);
+    setFromCache(false);
   };
 
   if (loading) {
@@ -132,6 +142,7 @@ export default function HomeScreen() {
         onClose={handleCloseModal}
         title={selectedItem?.title || ''}
         loading={illuminateLoading}
+        fromCache={fromCache}
         explanation={explanation}
       />
     </ThemedView>

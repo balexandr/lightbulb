@@ -9,6 +9,7 @@ interface IlluminateModalProps {
   onClose: () => void;
   title: string;
   loading?: boolean;
+  fromCache?: boolean;
   explanation?: {
     summary: string;
     why: string;
@@ -17,7 +18,7 @@ interface IlluminateModalProps {
   };
 }
 
-export function IlluminateModal({ visible, onClose, title, loading, explanation }: IlluminateModalProps) {
+export function IlluminateModal({ visible, onClose, title, loading, fromCache, explanation }: IlluminateModalProps) {
   const colorScheme = useColorScheme() ?? 'light';
 
   return (
@@ -39,6 +40,12 @@ export function IlluminateModal({ visible, onClose, title, loading, explanation 
           <ThemedText type="subtitle" style={styles.articleTitle} numberOfLines={4}>
             {title}
           </ThemedText>
+
+          {fromCache && !loading && (
+            <View style={styles.cacheBadge}>
+              <ThemedText style={styles.cacheText}>💾 Cached explanation</ThemedText>
+            </View>
+          )}
 
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -115,8 +122,20 @@ const styles = StyleSheet.create({
   },
   articleTitle: {
     fontSize: 18,
-    marginBottom: 24,
+    marginBottom: 12,
     lineHeight: 26,
+  },
+  cacheBadge: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 16,
+    alignSelf: 'flex-start',
+  },
+  cacheText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,
