@@ -1,233 +1,168 @@
-import { NewsItem } from '@/types/news';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { CACHE_CONFIG } from '@/constants/newsConfig';
+import { NewsItem } from '@/types/news';
+import { logger } from '@/utils/logger';
+import { simpleHash } from '@/utils/textUtils';
+
 interface CachedExplanation {
-  summary: string;
-  why: string;
-  impact: string;
-  credibility: string;
+  explanation: any;
   timestamp: number;
-  articleUrl: string;
-  articleTitle: string;
+  url: string;
 }
 
-const CACHE_PREFIX = '@lightbulb_explanation_';
-const CACHE_INDEX_KEY = '@lightbulb_cache_index';
-const CACHE_EXPIRY_DAYS = 7; // Explanations expire after 7 days
+interface CacheIndex {
+  keys: string[];
+  lastCleanup: number;
+}
 
-class CacheService {
-  // Generate a unique key for each article
-  private getCacheKey(item: NewsItem): string {
-    // Use URL as the primary identifier
-    const urlHash = this.simpleHash(item.url);
-    return `${CACHE_PREFIX}${urlHash}`;
-  }
-
-  // Simple hash function for URLs
-  private simpleHash(str: string): string {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash).toString(36);
-  }
-
-  // Check if cached data is still valid
-  private isExpired(timestamp: number): boolean {
-    const now = Date.now();
-    const expiryTime = CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-    return (now - timestamp) > expiryTime;
-  }
-
-  // Save explanation to cache
-  async saveExplanation(
-    item: NewsItem,
-    explanation: {
-      summary: string;
-      why: string;
-      impact: string;
-      credibility: string;
-    }
-  ): Promise<void> {
+export class CacheService {
+  private async getIndex(): Promise<CacheIndex> {
     try {
-      const cacheKey = this.getCacheKey(item);
-      const cachedData: CachedExplanation = {
-        ...explanation,
-        timestamp: Date.now(),
-        articleUrl: item.url,
-        articleTitle: item.title,
-      };
-
-      await AsyncStorage.setItem(cacheKey, JSON.stringify(cachedData));
-      
-      // Update cache index
-      await this.updateCacheIndex(cacheKey);
-      
-      console.log('✅ Cached explanation for:', item.title.substring(0, 50));
+      const indexStr = await AsyncStorage.getItem(CACHE_CONFIG.INDEX_KEY);
+      if (!indexStr) {
+        return { keys: [], lastCleanup: Date.now() };
+      }
+      return JSON.parse(indexStr);
     } catch (error) {
-      console.error('Error saving to cache:', error);
+      logger.error('Error reading cache index:', error);
+      return { keys: [], lastCleanup: Date.now() };
     }
   }
 
-  // Get explanation from cache
-  async getExplanation(item: NewsItem): Promise<{
-    summary: string;
-    why: string;
-    impact: string;
-    credibility: string;
-  } | null> {
+  private async updateIndex(index: CacheIndex): Promise<void> {
     try {
-      const cacheKey = this.getCacheKey(item);
-      const cached = await AsyncStorage.getItem(cacheKey);
+      await AsyncStorage.setItem(CACHE_CONFIG.INDEX_KEY, JSON.stringify(index));
+    } catch (error) {
+      logger.error('Error updating cache index:', error);
+    }
+  }
+
+  private getCacheKey(item: NewsItem): string {
+    const urlHash = simpleHash(item.url);
+    return `${CACHE_CONFIG.EXPLANATION_PREFIX}${urlHash}`;
+  }
+
+  async getExplanation(item: NewsItem): Promise<any | null> {
+    try {
+      const key = this.getCacheKey(item);
+      const cached = await AsyncStorage.getItem(key);
       
       if (!cached) {
-        console.log('❌ No cache found for:', item.title.substring(0, 50));
         return null;
       }
 
-      const cachedData: CachedExplanation = JSON.parse(cached);
+      const { explanation, timestamp }: CachedExplanation = JSON.parse(cached);
+      const age = Date.now() - timestamp;
+      const maxAge = CACHE_CONFIG.EXPLANATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
-      // Check if expired
-      if (this.isExpired(cachedData.timestamp)) {
-        console.log('⏰ Cache expired for:', item.title.substring(0, 50));
-        await AsyncStorage.removeItem(cacheKey);
-        await this.removeFromCacheIndex(cacheKey);
+      if (age > maxAge) {
+        await AsyncStorage.removeItem(key);
         return null;
       }
 
-      console.log('✅ Cache hit for:', item.title.substring(0, 50));
-      return {
-        summary: cachedData.summary,
-        why: cachedData.why,
-        impact: cachedData.impact,
-        credibility: cachedData.credibility,
-      };
+      logger.info('Retrieved explanation from cache');
+      return explanation;
     } catch (error) {
-      console.error('Error reading from cache:', error);
+      logger.error('Error reading explanation cache:', error);
       return null;
     }
   }
 
-  // Update cache index (for management)
-  private async updateCacheIndex(cacheKey: string): Promise<void> {
+  async setExplanation(item: NewsItem, explanation: any): Promise<void> {
     try {
-      const indexStr = await AsyncStorage.getItem(CACHE_INDEX_KEY);
-      const index: string[] = indexStr ? JSON.parse(indexStr) : [];
-      
-      if (!index.includes(cacheKey)) {
-        index.push(cacheKey);
-        await AsyncStorage.setItem(CACHE_INDEX_KEY, JSON.stringify(index));
+      const key = this.getCacheKey(item);
+      const cached: CachedExplanation = {
+        explanation,
+        timestamp: Date.now(),
+        url: item.url,
+      };
+
+      await AsyncStorage.setItem(key, JSON.stringify(cached));
+
+      const index = await this.getIndex();
+      if (!index.keys.includes(key)) {
+        index.keys.push(key);
+        await this.updateIndex(index);
       }
+
+      logger.info('Cached explanation');
     } catch (error) {
-      console.error('Error updating cache index:', error);
+      logger.error('Error caching explanation:', error);
     }
   }
 
-  // Remove from cache index
-  private async removeFromCacheIndex(cacheKey: string): Promise<void> {
+  async getCacheStats(): Promise<{ count: number; oldestAge: number | null }> {
     try {
-      const indexStr = await AsyncStorage.getItem(CACHE_INDEX_KEY);
-      if (!indexStr) return;
+      const index = await this.getIndex();
+      let oldestTimestamp: number | null = null;
 
-      const index: string[] = JSON.parse(indexStr);
-      const newIndex = index.filter(key => key !== cacheKey);
-      await AsyncStorage.setItem(CACHE_INDEX_KEY, JSON.stringify(newIndex));
-    } catch (error) {
-      console.error('Error removing from cache index:', error);
-    }
-  }
-
-  // Get cache statistics
-  async getCacheStats(): Promise<{
-    totalCached: number;
-    totalSize: string;
-    oldestEntry?: Date;
-  }> {
-    try {
-      const indexStr = await AsyncStorage.getItem(CACHE_INDEX_KEY);
-      const index: string[] = indexStr ? JSON.parse(indexStr) : [];
-      
-      let oldestTimestamp = Date.now();
-      let totalSize = 0;
-
-      for (const key of index) {
-        const item = await AsyncStorage.getItem(key);
-        if (item) {
-          totalSize += item.length;
-          const cached: CachedExplanation = JSON.parse(item);
-          if (cached.timestamp < oldestTimestamp) {
-            oldestTimestamp = cached.timestamp;
+      for (const key of index.keys) {
+        const cached = await AsyncStorage.getItem(key);
+        if (cached) {
+          const { timestamp } = JSON.parse(cached);
+          if (!oldestTimestamp || timestamp < oldestTimestamp) {
+            oldestTimestamp = timestamp;
           }
         }
       }
+
+      const oldestAge = oldestTimestamp 
+        ? Math.floor((Date.now() - oldestTimestamp) / (1000 * 60 * 60 * 24))
+        : null;
 
       return {
-        totalCached: index.length,
-        totalSize: `${(totalSize / 1024).toFixed(2)} KB`,
-        oldestEntry: index.length > 0 ? new Date(oldestTimestamp) : undefined,
+        count: index.keys.length,
+        oldestAge,
       };
     } catch (error) {
-      console.error('Error getting cache stats:', error);
-      return { totalCached: 0, totalSize: '0 KB' };
+      logger.error('Error getting cache stats:', error);
+      return { count: 0, oldestAge: null };
     }
   }
 
-  // Clear all expired cache entries
-  async clearExpiredCache(): Promise<number> {
+  async clearExpiredCache(): Promise<void> {
     try {
-      const indexStr = await AsyncStorage.getItem(CACHE_INDEX_KEY);
-      if (!indexStr) return 0;
+      const index = await this.getIndex();
+      const maxAge = CACHE_CONFIG.EXPLANATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+      const validKeys: string[] = [];
 
-      const index: string[] = JSON.parse(indexStr);
-      let clearedCount = 0;
+      for (const key of index.keys) {
+        const cached = await AsyncStorage.getItem(key);
+        if (cached) {
+          const { timestamp } = JSON.parse(cached);
+          const age = Date.now() - timestamp;
 
-      for (const key of index) {
-        const item = await AsyncStorage.getItem(key);
-        if (item) {
-          const cached: CachedExplanation = JSON.parse(item);
-          if (this.isExpired(cached.timestamp)) {
+          if (age <= maxAge) {
+            validKeys.push(key);
+          } else {
             await AsyncStorage.removeItem(key);
-            clearedCount++;
           }
         }
       }
 
-      // Update index
-      const newIndex = [];
-      for (const key of index) {
-        const exists = await AsyncStorage.getItem(key);
-        if (exists) {
-          newIndex.push(key);
-        }
-      }
-      await AsyncStorage.setItem(CACHE_INDEX_KEY, JSON.stringify(newIndex));
+      index.keys = validKeys;
+      index.lastCleanup = Date.now();
+      await this.updateIndex(index);
 
-      console.log(`🧹 Cleared ${clearedCount} expired cache entries`);
-      return clearedCount;
+      logger.info(`Cleared ${index.keys.length - validKeys.length} expired cache entries`);
     } catch (error) {
-      console.error('Error clearing expired cache:', error);
-      return 0;
+      logger.error('Error clearing expired cache:', error);
     }
   }
 
-  // Clear all cache
   async clearAllCache(): Promise<void> {
     try {
-      const indexStr = await AsyncStorage.getItem(CACHE_INDEX_KEY);
-      if (!indexStr) return;
-
-      const index: string[] = JSON.parse(indexStr);
+      const index = await this.getIndex();
       
-      for (const key of index) {
+      for (const key of index.keys) {
         await AsyncStorage.removeItem(key);
       }
 
-      await AsyncStorage.removeItem(CACHE_INDEX_KEY);
-      console.log('🧹 Cleared all cache');
+      await AsyncStorage.removeItem(CACHE_CONFIG.INDEX_KEY);
+      logger.info('Cleared all explanation cache');
     } catch (error) {
-      console.error('Error clearing all cache:', error);
+      logger.error('Error clearing all cache:', error);
     }
   }
 }
