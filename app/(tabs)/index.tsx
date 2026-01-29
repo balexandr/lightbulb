@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { IlluminateModal } from '@/components/IlluminateModal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -12,6 +13,10 @@ export default function HomeScreen() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<NewsItem | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [illuminateLoading, setIlluminateLoading] = useState(false);
+  const [explanation, setExplanation] = useState<any>(null);
   const colorScheme = useColorScheme() ?? 'light';
 
   const loadNews = async () => {
@@ -35,9 +40,29 @@ export default function HomeScreen() {
     loadNews();
   };
 
-  const handleIlluminate = (item: NewsItem) => {
-    // TODO: Open modal/card with AI explanation
-    console.log('Illuminate:', item.title);
+  const handleIlluminate = async (item: NewsItem) => {
+    setSelectedItem(item);
+    setModalVisible(true);
+    setIlluminateLoading(true);
+    setExplanation(null);
+
+    // TODO: Call AI service here
+    // For now, using mock data
+    setTimeout(() => {
+      setExplanation({
+        summary: 'This is a placeholder summary of the article. It will be replaced with AI-generated content that provides a concise overview of what the article is about.',
+        why: 'This is a placeholder explanation of why this is happening. The AI will provide context and background information about the events or trends described in the article.',
+        impact: 'This is a placeholder for how this affects you. The AI will explain the potential consequences and relevance of this news to the reader\'s daily life.',
+        credibility: 'This is a placeholder for source credibility analysis. The AI will assess the reliability of the source and any potential biases.',
+      });
+      setIlluminateLoading(false);
+    }, 2000);
+  };
+
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setSelectedItem(null);
+    setExplanation(null);
   };
 
   if (loading) {
@@ -102,6 +127,14 @@ export default function HomeScreen() {
           </ThemedView>
         )}
         contentContainerStyle={styles.listContent}
+      />
+
+      <IlluminateModal
+        visible={modalVisible}
+        onClose={handleCloseModal}
+        title={selectedItem?.title || ''}
+        loading={illuminateLoading}
+        explanation={explanation}
       />
     </ThemedView>
   );
