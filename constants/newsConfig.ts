@@ -48,6 +48,7 @@ export const TRUSTED_NEWS_DOMAINS = [
   'news.ycombinator.com',
   'cbc.ca',
   'huffpost.com',
+  'aljazeera.com'
 ] as const;
 
 export const CACHE_CONFIG = {
