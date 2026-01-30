@@ -50,8 +50,8 @@ class AIService {
       context.push(`political perspective: ${standpoints[preferences.politicalStandpoint]}`);
     }
     
-    if (preferences.age) {
-      context.push(`age: ${preferences.age}`);
+    if (preferences.ageRange) {
+      context.push(`age range: ${preferences.ageRange}`);
     }
     
     if (preferences.location) {
@@ -87,6 +87,18 @@ class AIService {
       const preferences = await preferencesService.getPreferences();
       const userContext = this.buildUserContext(preferences);
       
+      let impactGuidance = '';
+      if (preferences.politicalStandpoint || preferences.ageRange) {
+        const aspects = [];
+        if (preferences.politicalStandpoint) {
+          aspects.push(`a ${preferences.politicalStandpoint} perspective`);
+        }
+        if (preferences.ageRange) {
+          aspects.push(`someone aged ${preferences.ageRange}`);
+        }
+        impactGuidance = ` - consider how this might be viewed from ${aspects.join(' and ')} and its relevance to them`;
+      }
+      
       const prompt = `Analyze this news headline and provide context:
 
 Title: ${item.title}
@@ -96,7 +108,7 @@ ${item.domain ? `Domain: ${item.domain}` : ''}${userContext}
 Please provide:
 1. A brief summary (2-3 sentences)
 2. Why this matters (context and background)
-3. Potential impact or implications${preferences.politicalStandpoint ? ` - consider how this might be viewed from a ${preferences.politicalStandpoint} perspective and its relevance to someone with that viewpoint` : ''}
+3. Potential impact or implications${impactGuidance}
 4. Source credibility assessment
 
 Format as JSON with keys: summary, why, impact, credibility`;
@@ -106,7 +118,7 @@ Format as JSON with keys: summary, why, impact, credibility`;
         messages: [
           {
             role: 'system',
-            content: `You are a helpful news analyst who provides clear, balanced context about news stories. When user preferences are provided, tailor the "impact" section to be relevant to their perspective while remaining factual and unbiased in other sections. Focus on facts and verifiable information.`,
+            content: `You are a helpful news analyst who provides clear, balanced context about news stories. When user preferences are provided, tailor the "impact" section to be relevant to their perspective and demographic while remaining factual and unbiased in other sections. Focus on facts and verifiable information.`,
           },
           {
             role: 'user',

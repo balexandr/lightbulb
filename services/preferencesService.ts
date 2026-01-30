@@ -2,9 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { logger } from '@/utils/logger';
 
+export type AgeRange = '18-24' | '25-34' | '35-44' | '45-54' | '55-64' | '65+';
+
 export interface UserPreferences {
   politicalStandpoint?: 'progressive' | 'liberal' | 'moderate' | 'conservative' | 'libertarian';
-  age?: number;
+  ageRange?: AgeRange;
   gender?: string;
   location?: string;
 }

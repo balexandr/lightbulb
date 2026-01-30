@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { preferencesService, UserPreferences } from '@/services/preferencesService';
+import { AgeRange, preferencesService, UserPreferences } from '@/services/preferencesService';
 
 type PoliticalStandpoint = NonNullable<UserPreferences['politicalStandpoint']>;
 
@@ -26,6 +26,15 @@ export default function ExploreScreen() {
     const newPrefs = {
       ...preferences,
       politicalStandpoint: preferences.politicalStandpoint === standpoint ? undefined : standpoint,
+    };
+    setPreferences(newPrefs);
+    await preferencesService.savePreferences(newPrefs);
+  };
+
+  const handleAgeRangeChange = async (ageRange: AgeRange) => {
+    const newPrefs = {
+      ...preferences,
+      ageRange: preferences.ageRange === ageRange ? undefined : ageRange,
     };
     setPreferences(newPrefs);
     await preferencesService.savePreferences(newPrefs);
@@ -58,6 +67,8 @@ export default function ExploreScreen() {
       description: 'Individual liberty, minimal government intervention',
     },
   ];
+
+  const ageRangeOptions: AgeRange[] = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
 
   return (
     <ThemedView style={styles.container}>
@@ -108,9 +119,7 @@ export default function ExploreScreen() {
                     style={[
                       styles.optionDescription,
                       {
-                        color: isSelected
-                          ? '#333333'
-                          : Colors[colorScheme].text,
+                        color: isSelected ? '#333333' : Colors[colorScheme].text,
                         opacity: isSelected ? 1 : 0.6,
                       },
                     ]}
@@ -135,12 +144,53 @@ export default function ExploreScreen() {
 
         <ThemedView style={styles.section}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Age Range
+          </ThemedText>
+          <ThemedText style={styles.sectionDescription}>
+            Helps provide age-appropriate context and relevance
+          </ThemedText>
+
+          <View style={styles.ageRangeContainer}>
+            {ageRangeOptions.map((range) => {
+              const isSelected = preferences.ageRange === range;
+              return (
+                <TouchableOpacity
+                  key={range}
+                  style={[
+                    styles.ageRangeButton,
+                    {
+                      backgroundColor: isSelected
+                        ? Colors[colorScheme].tint
+                        : colorScheme === 'dark'
+                        ? '#2C2C2E'
+                        : '#F2F2F7',
+                      borderColor: isSelected ? Colors[colorScheme].tint : 'transparent',
+                    },
+                  ]}
+                  onPress={() => handleAgeRangeChange(range)}
+                >
+                  <Text
+                    style={[
+                      styles.ageRangeText,
+                      { color: isSelected ? '#000000' : Colors[colorScheme].text },
+                    ]}
+                  >
+                    {range}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ThemedView>
+
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
             Coming Soon
           </ThemedText>
           <ThemedText style={styles.comingSoonText}>
-            • Age-based relevance
-            {'\n'}• Location-specific impacts
+            • Location-specific impacts
             {'\n'}• Custom interests and topics
+            {'\n'}• Personalized news sources
           </ThemedText>
         </ThemedView>
       </ScrollView>
@@ -197,6 +247,23 @@ const styles = StyleSheet.create({
   optionDescription: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  ageRangeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  ageRangeButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderWidth: 2,
+    minWidth: 90,
+    alignItems: 'center',
+  },
+  ageRangeText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   infoBox: {
     marginTop: 16,
