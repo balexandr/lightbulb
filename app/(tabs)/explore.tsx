@@ -1,112 +1,217 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { preferencesService, UserPreferences } from '@/services/preferencesService';
 
-export default function TabTwoScreen() {
+type PoliticalStandpoint = NonNullable<UserPreferences['politicalStandpoint']>;
+
+export default function ExploreScreen() {
+  const [preferences, setPreferences] = useState<UserPreferences>({});
+  const colorScheme = useColorScheme() ?? 'light';
+
+  useEffect(() => {
+    loadPreferences();
+  }, []);
+
+  const loadPreferences = async () => {
+    const prefs = await preferencesService.getPreferences();
+    setPreferences(prefs);
+  };
+
+  const handlePoliticalStandpointChange = async (standpoint: PoliticalStandpoint) => {
+    const newPrefs = {
+      ...preferences,
+      politicalStandpoint: preferences.politicalStandpoint === standpoint ? undefined : standpoint,
+    };
+    setPreferences(newPrefs);
+    await preferencesService.savePreferences(newPrefs);
+  };
+
+  const politicalOptions: { value: PoliticalStandpoint; label: string; description: string }[] = [
+    {
+      value: 'progressive',
+      label: 'Progressive',
+      description: 'Social justice, environmental action, structural reform',
+    },
+    {
+      value: 'liberal',
+      label: 'Liberal',
+      description: 'Individual rights, social programs, regulated markets',
+    },
+    {
+      value: 'moderate',
+      label: 'Moderate',
+      description: 'Balanced approach, case-by-case evaluation',
+    },
+    {
+      value: 'conservative',
+      label: 'Conservative',
+      description: 'Traditional values, limited government, free markets',
+    },
+    {
+      value: 'libertarian',
+      label: 'Libertarian',
+      description: 'Individual liberty, minimal government intervention',
+    },
+  ];
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <ThemedView style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <ThemedView style={styles.header}>
+          <ThemedText type="title">Settings</ThemedText>
+          <ThemedText style={styles.subtitle}>
+            Personalize how news impacts are explained to you
+          </ThemedText>
+        </ThemedView>
+
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Political Perspective
+          </ThemedText>
+          <ThemedText style={styles.sectionDescription}>
+            Get impact analysis tailored to your viewpoint while maintaining factual reporting
+          </ThemedText>
+
+          <View style={styles.optionsContainer}>
+            {politicalOptions.map((option) => {
+              const isSelected = preferences.politicalStandpoint === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.optionButton,
+                    {
+                      backgroundColor: isSelected
+                        ? Colors[colorScheme].tint
+                        : colorScheme === 'dark'
+                        ? '#2C2C2E'
+                        : '#F2F2F7',
+                      borderColor: isSelected ? Colors[colorScheme].tint : 'transparent',
+                    },
+                  ]}
+                  onPress={() => handlePoliticalStandpointChange(option.value)}
+                >
+                  <Text
+                    style={[
+                      styles.optionLabel,
+                      { color: isSelected ? '#000000' : Colors[colorScheme].text },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.optionDescription,
+                      {
+                        color: isSelected
+                          ? '#333333'
+                          : Colors[colorScheme].text,
+                        opacity: isSelected ? 1 : 0.6,
+                      },
+                    ]}
+                  >
+                    {option.description}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {preferences.politicalStandpoint && (
+            <ThemedView style={styles.infoBox}>
+              <ThemedText style={styles.infoText}>
+                ℹ️ Impact analysis will be tailored to a {preferences.politicalStandpoint}{' '}
+                perspective while maintaining objectivity in summaries and credibility
+                assessments.
+              </ThemedText>
+            </ThemedView>
+          )}
+        </ThemedView>
+
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Coming Soon
+          </ThemedText>
+          <ThemedText style={styles.comingSoonText}>
+            • Age-based relevance
+            {'\n'}• Location-specific impacts
+            {'\n'}• Custom interests and topics
+          </ThemedText>
+        </ThemedView>
+      </ScrollView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 80,
+    paddingBottom: 40,
+  },
+  header: {
+    paddingHorizontal: 20,
+    marginBottom: 32,
+  },
+  subtitle: {
+    fontSize: 15,
+    opacity: 0.7,
+    marginTop: 8,
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    marginBottom: 8,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    opacity: 0.7,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  optionsContainer: {
+    gap: 12,
+  },
+  optionButton: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  optionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  optionDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  infoBox: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  infoText: {
+    fontSize: 13,
+    lineHeight: 20,
+    opacity: 0.9,
+  },
+  comingSoonText: {
+    fontSize: 14,
+    opacity: 0.5,
+    lineHeight: 24,
   },
 });

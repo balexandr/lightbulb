@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
 import { API_CONFIG } from '@/constants/newsConfig';
-import { NewsItem } from '@/types/news';
+import { AIExplanation, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
 
 type AIExplanation = {
@@ -12,6 +12,7 @@ type AIExplanation = {
 };
 
 import { cacheService } from './cacheService';
+import { preferencesService, UserPreferences } from './preferencesService';
 
 class AIService {
   private openai: OpenAI | null = null;
@@ -42,6 +43,33 @@ class AIService {
     this.lastRequestTime = Date.now();
   }
 
+  private buildUserContext(preferences: UserPreferences): string {
+    const context: string[] = [];
+    
+    if (preferences.politicalStandpoint) {
+      const standpoints = {
+        progressive: 'progressive/left-leaning perspective',
+        liberal: 'liberal perspective',
+        moderate: 'moderate/centrist perspective',
+        conservative: 'conservative perspective',
+        libertarian: 'libertarian perspective',
+      };
+      context.push(`political perspective: ${standpoints[preferences.politicalStandpoint]}`);
+    }
+    
+    if (preferences.age) {
+      context.push(`age: ${preferences.age}`);
+    }
+    
+    if (preferences.location) {
+      context.push(`location: ${preferences.location}`);
+    }
+    
+    return context.length > 0 
+      ? `\n\nUser context: ${context.join(', ')}`
+      : '';
+  }
+
   async explainNews(item: NewsItem): Promise<AIExplanation> {
     // Check cache first
     logger.debug('Checking cache for', item.url);
@@ -56,7 +84,6 @@ class AIService {
     if (!this.openai) {
       logger.info('Using mock explanation (no API key)');
       const mockExplanation = this.getMockExplanation(item);
-      // Cache the mock explanation too
       await cacheService.setExplanation(item, mockExplanation);
       return mockExplanation;
     }
@@ -64,16 +91,19 @@ class AIService {
     try {
       await this.rateLimit();
       
+      const preferences = await preferencesService.getPreferences();
+      const userContext = this.buildUserContext(preferences);
+      
       const prompt = `Analyze this news headline and provide context:
 
 Title: ${item.title}
 Source: ${item.source.name}
-${item.domain ? `Domain: ${item.domain}` : ''}
+${item.domain ? `Domain: ${item.domain}` : ''}${userContext}
 
 Please provide:
 1. A brief summary (2-3 sentences)
 2. Why this matters (context and background)
-3. Potential impact or implications
+3. Potential impact or implications${preferences.politicalStandpoint ? ` - consider how this might be viewed from a ${preferences.politicalStandpoint} perspective and its relevance to someone with that viewpoint` : ''}
 4. Source credibility assessment
 
 Format as JSON with keys: summary, why, impact, credibility`;
@@ -83,7 +113,7 @@ Format as JSON with keys: summary, why, impact, credibility`;
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful news analyst who provides clear, unbiased context about news stories. Focus on facts and verifiable information.',
+            content: `You are a helpful news analyst who provides clear, balanced context about news stories. When user preferences are provided, tailor the "impact" section to be relevant to their perspective while remaining factual and unbiased in other sections. Focus on facts and verifiable information.`,
           },
           {
             role: 'user',
@@ -105,14 +135,12 @@ Format as JSON with keys: summary, why, impact, credibility`;
       logger.success('Generated and cached new explanation');
       return explanation;
     } catch (error: any) {
-      // Only log if it's not a quota error
       if (!error.message?.includes('quota')) {
         logger.error('Error calling OpenAI:', error.message);
       } else {
         logger.info('OpenAI quota exceeded, using mock data');
       }
       const mockExplanation = this.getMockExplanation(item);
-      // Cache the mock explanation so we don't keep hitting the API
       await cacheService.setExplanation(item, mockExplanation);
       return mockExplanation;
     }
