@@ -22,3 +22,10 @@ export interface FilterConfig {
   deprioritizeOneLiners?: boolean;
   minScore?: number;
 }
+
+export interface AIExplanation {
+  summary: string;
+  why: string;
+  impact: string;
+  credibility: string;
+};

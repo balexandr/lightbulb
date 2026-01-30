@@ -4,13 +4,6 @@ import { API_CONFIG } from '@/constants/newsConfig';
 import { AIExplanation, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
 
-type AIExplanation = {
-  summary: string;
-  why: string;
-  impact: string;
-  credibility: string;
-};
-
 import { cacheService } from './cacheService';
 import { preferencesService, UserPreferences } from './preferencesService';
 
