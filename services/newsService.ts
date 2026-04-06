@@ -22,6 +22,22 @@ export class NewsService {
         });
 
         const items = rssParser.parseFeed(response.data, feed);
+
+        // Resolve OG images for items that had no image in the RSS XML
+        const itemsWithoutImages = items.filter(item => !item.imageUrl);
+        if (itemsWithoutImages.length > 0) {
+          logger.info(`Resolving OG images for ${itemsWithoutImages.length} ${feed.name} articles`);
+          await this.resolveArticleImages(itemsWithoutImages);
+
+          // Apply favicon fallback for any still unresolved
+          const fallback = rssParser.getLargeFavicon(feed);
+          for (const item of itemsWithoutImages) {
+            if (!item.imageUrl) {
+              item.imageUrl = fallback;
+            }
+          }
+        }
+
         allItems.push(...items);
         
         logger.success(`Fetched ${items.length} items from ${feed.name}`);
@@ -60,6 +76,51 @@ export class NewsService {
     }
 
     return allPosts;
+  }
+
+  private async resolveArticleImages(items: NewsItem[]): Promise<void> {
+    const results = await Promise.allSettled(
+      items.map(async (item) => {
+        const ogImage = await this.fetchOgImage(item.url);
+        if (ogImage) {
+          item.imageUrl = ogImage;
+        }
+      })
+    );
+
+    const resolved = results.filter(r => r.status === 'fulfilled').length;
+    logger.debug('OG image resolution', `${resolved}/${items.length} succeeded`);
+  }
+
+  private async fetchOgImage(articleUrl: string): Promise<string | undefined> {
+    try {
+      const url = getCorsProxyUrl(articleUrl);
+      const response = await axios.get(url, {
+        timeout: 8000,
+        headers: {
+          'Accept': 'text/html',
+          ...(!getCorsProxyUrl(articleUrl).includes('allorigins') && { 'User-Agent': 'Lightbulb News App/1.0' }),
+        },
+        // Only fetch the head portion to save bandwidth
+        responseType: 'text',
+      });
+
+      const html = typeof response.data === 'string' ? response.data : '';
+      // Limit search to the <head> section for efficiency
+      const headEnd = html.indexOf('</head>');
+      const headHtml = headEnd > 0 ? html.substring(0, headEnd) : html.substring(0, 10000);
+
+      const ogMatch = headHtml.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+        || headHtml.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+
+      if (ogMatch?.[1]) {
+        logger.debug(`Resolved OG image for ${articleUrl}`, ogMatch[1]);
+        return ogMatch[1];
+      }
+    } catch (error: any) {
+      logger.debug(`Failed to fetch OG image for ${articleUrl}`, error.message);
+    }
+    return undefined;
   }
 
   private deduplicatePosts(posts: NewsItem[]): NewsItem[] {
