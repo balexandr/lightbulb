@@ -31,18 +31,6 @@ export function extractDomain(url: string): string {
   }
 }
 
-export function extractXMLTag(xml: string, tag: string): string {
-  const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
-  const match = xml.match(regex);
-  return match ? match[1].trim() : '';
-}
-
-export function extractXMLAttribute(xml: string, tag: string, attribute: string): string {
-  const regex = new RegExp(`<${tag}[^>]*${attribute}="([^"]+)"`, 'i');
-  const match = xml.match(regex);
-  return match ? match[1] : '';
-}
-
 export function simpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {

@@ -11,7 +11,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { aiService } from '@/services/aiService';
 import { cacheService } from '@/services/cacheService';
 import { newsService } from '@/services/newsService';
-import { NewsItem } from '@/types/news';
+import { AIExplanation, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
 
 export default function HomeScreen() {
@@ -23,7 +23,7 @@ export default function HomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
   const [illuminateLoading, setIlluminateLoading] = useState(false);
-  const [explanation, setExplanation] = useState<any>(null);
+  const [explanation, setExplanation] = useState<AIExplanation | null>(null);
   const [fromCache, setFromCache] = useState(false);
   
   const [rssSources, setRssSources] = useState<string[]>([]);
@@ -75,8 +75,11 @@ export default function HomeScreen() {
     }
   }, [news, selectedSources]);
 
+  // Intentionally mount-only: loadNews reads selectedSources but we only
+  // want the initial fetch here, not a refetch every time filters change.
   useEffect(() => {
     loadNews(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onRefresh = () => {
@@ -256,7 +259,7 @@ export default function HomeScreen() {
         title={selectedItem?.title || ''}
         loading={illuminateLoading}
         fromCache={fromCache}
-        explanation={explanation}
+        explanation={explanation ?? undefined}
       />
 
       <FilterMenu

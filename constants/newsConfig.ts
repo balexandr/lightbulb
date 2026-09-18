@@ -1,4 +1,11 @@
-export const RSS_FEEDS = [
+export interface RSSFeedConfig {
+  name: string;
+  url: string;
+  icon: string;
+  fallbackImage: string;
+}
+
+export const RSS_FEEDS: RSSFeedConfig[] = [
   { 
     name: 'BBC', 
     url: 'https://feeds.bbci.co.uk/news/world/rss.xml',
@@ -23,7 +30,7 @@ export const RSS_FEEDS = [
     icon: 'https://techcrunch.com/wp-content/uploads/2015/02/cropped-cropped-favicon-gradient.png',
     fallbackImage: 'https://techcrunch.com/wp-content/uploads/2015/02/cropped-cropped-favicon-gradient.png'
   },
-] as const;
+];
 
 export const REDDIT_SUBREDDITS = [
   'worldnews',

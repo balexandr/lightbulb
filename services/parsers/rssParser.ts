@@ -1,50 +1,75 @@
-import { RSS_FEEDS } from '@/constants/newsConfig';
+import { XMLParser } from 'fast-xml-parser';
+
+import { RSSFeedConfig } from '@/constants/newsConfig';
 import { NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
-import { cleanHTML, extractDomain, extractXMLAttribute, extractXMLTag } from '@/utils/textUtils';
+import { cleanHTML, extractDomain } from '@/utils/textUtils';
+
+const xmlParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  textNodeName: '#text',
+  trimValues: true,
+});
+
+// fast-xml-parser gives back a single object for a one-item list and an
+// array for a multi-item list. This normalizes both to an array.
+function asArray<T>(value: T | T[] | undefined): T[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+// A tag with attributes and no text parses as { '@_attr': ... }, one with
+// only text parses as a plain string. This reads either shape uniformly.
+function textOf(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (value && typeof value === 'object' && '#text' in (value as Record<string, unknown>)) {
+    return String((value as Record<string, unknown>)['#text']);
+  }
+  return '';
+}
+
+function attrOf(value: unknown, attribute: string): string {
+  if (value && typeof value === 'object') {
+    const attr = (value as Record<string, unknown>)[`@_${attribute}`];
+    if (attr !== undefined) return String(attr);
+  }
+  return '';
+}
 
 export class RSSParser {
-  parseFeed(xmlText: string, feedConfig: typeof RSS_FEEDS[number]): NewsItem[] {
-    const items: NewsItem[] = [];
-    
+  parseFeed(xmlText: string, feedConfig: RSSFeedConfig): NewsItem[] {
     try {
-      const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-      const matches = xmlText.matchAll(itemRegex);
-      
-      for (const match of matches) {
-        const item = this.parseItem(match[1], feedConfig);
-        if (item) {
-          items.push(item);
+      const parsed = xmlParser.parse(xmlText);
+      const items = asArray(parsed?.rss?.channel?.item);
+
+      const newsItems: NewsItem[] = [];
+      for (const item of items) {
+        const parsedItem = this.parseItem(item, feedConfig);
+        if (parsedItem) {
+          newsItems.push(parsedItem);
         }
       }
+      return newsItems;
     } catch (error) {
       throw new Error(`Failed to parse RSS feed for ${feedConfig.name}: ${error}`);
     }
-    
-    return items;
   }
 
-  private parseItem(itemXml: string, feedConfig: typeof RSS_FEEDS[number]): NewsItem | null {
-    let title = extractXMLTag(itemXml, 'title');
-    const link = extractXMLTag(itemXml, 'link');
-    const pubDate = extractXMLTag(itemXml, 'pubDate');
-    const description = extractXMLTag(itemXml, 'description');
-    const contentEncoded = extractXMLTag(itemXml, 'content:encoded');
-    
-    // Handle CDATA in title (common in BBC and other feeds)
-    if (title.includes('<![CDATA[')) {
-      const cdataMatch = title.match(/<!\[CDATA\[(.*?)\]\]>/);
-      if (cdataMatch) {
-        title = cdataMatch[1];
-      }
-    }
-    
+  private parseItem(item: Record<string, unknown>, feedConfig: RSSFeedConfig): NewsItem | null {
+    const title = textOf(item.title);
+    const link = textOf(item.link);
+    const pubDate = textOf(item.pubDate);
+    const description = textOf(item.description);
+    const contentEncoded = textOf(item['content:encoded']);
+
     if (!title || !link) {
       return null;
     }
 
-    const imageUrl = this.extractImageUrl(itemXml, description, contentEncoded, feedConfig);
-    
+    const imageUrl = this.extractImageUrl(item, description, contentEncoded, feedConfig);
+
     return {
       id: `rss-${feedConfig.name}-${link}`,
       title: cleanHTML(title),
@@ -60,7 +85,7 @@ export class RSSParser {
     };
   }
 
-  getLargeFavicon(feedConfig: typeof RSS_FEEDS[number]): string {
+  getLargeFavicon(feedConfig: RSSFeedConfig): string {
     // Map feed names to larger icon URLs
     const largeFavicons: Record<string, string> = {
       'NPR': 'https://media.npr.org/chrome_svg/npr-logo.svg',
@@ -76,7 +101,7 @@ export class RSSParser {
 
   private isValidImage(url: string): boolean {
     if (!url) return false;
-    
+
     // Filter out tracking pixels and invalid images
     const invalidPatterns = [
       'tracking',
@@ -86,14 +111,14 @@ export class RSSParser {
       'blank',
       'transparent',
     ];
-    
+
     const urlLower = url.toLowerCase();
-    
+
     // Check for invalid patterns
     if (invalidPatterns.some(pattern => urlLower.includes(pattern))) {
       return false;
     }
-    
+
     // Check minimum size if dimensions are in URL
     const sizeMatch = url.match(/(\d+)x(\d+)/);
     if (sizeMatch) {
@@ -103,51 +128,43 @@ export class RSSParser {
         return false;
       }
     }
-    
+
     return true;
   }
 
   private extractImageUrl(
-    itemXml: string, 
+    item: Record<string, unknown>,
     description: string,
     contentEncoded: string,
-    feedConfig: typeof RSS_FEEDS[number]
+    feedConfig: RSSFeedConfig
   ): string | undefined {
     // Try multiple image extraction methods in order of preference
-    
+
     // 1. Try media:content
-    let imageUrl = this.extractMediaContent(itemXml);
+    let imageUrl = this.extractMediaContent(item);
     if (imageUrl && this.isValidImage(imageUrl)) {
       logger.debug(`Found image from media:content for ${feedConfig.name}`, imageUrl);
       return imageUrl;
     }
-    
+
     // 2. Try media:thumbnail
-    imageUrl = extractXMLAttribute(itemXml, 'media:thumbnail', 'url');
+    imageUrl = attrOf(item['media:thumbnail'], 'url');
     if (imageUrl && this.isValidImage(imageUrl)) {
       logger.debug(`Found image from media:thumbnail for ${feedConfig.name}`, imageUrl);
       return imageUrl;
     }
-    
+
     // 3. Try enclosure
-    imageUrl = extractXMLAttribute(itemXml, 'enclosure', 'url');
+    imageUrl = attrOf(item.enclosure, 'url');
     if (imageUrl && this.isValidImage(imageUrl)) {
       logger.debug(`Found image from enclosure for ${feedConfig.name}`, imageUrl);
       return imageUrl;
     }
-    
+
     // 4. For NPR, extract from content:encoded
     if (contentEncoded) {
-      let cleanContent = contentEncoded;
-      if (contentEncoded.includes('<![CDATA[')) {
-        const cdataMatch = contentEncoded.match(/<!\[CDATA\[(.*?)\]\]>/s);
-        if (cdataMatch) {
-          cleanContent = cdataMatch[1];
-        }
-      }
-      
       // Extract first <img> tag from content:encoded
-      const imgMatch = cleanContent.match(/<img[^>]+src=['"]([^'"]+)['"]/);
+      const imgMatch = contentEncoded.match(/<img[^>]+src=['"]([^'"]+)['"]/);
       if (imgMatch) {
         const foundUrl = imgMatch[1];
         if (this.isValidImage(foundUrl)) {
@@ -157,23 +174,12 @@ export class RSSParser {
       }
     }
 
-    // 5. Handle CDATA in description
+    // 5. Extract from description HTML
     if (description) {
-      let cleanDescription = description;
-      if (description.includes('<![CDATA[')) {
-        const cdataMatch = description.match(/<!\[CDATA\[(.*?)\]\]>/s);
-        if (cdataMatch) {
-          cleanDescription = cdataMatch[1];
-        }
-      }
-      
-      // Extract from description HTML
-      if (cleanDescription) {
-        const imgMatch = cleanDescription.match(/<img[^>]+src="([^">]+)"/);
-        if (imgMatch && this.isValidImage(imgMatch[1])) {
-          logger.debug(`Found image from description for ${feedConfig.name}`, imgMatch[1]);
-          return imgMatch[1];
-        }
+      const imgMatch = description.match(/<img[^>]+src="([^">]+)"/);
+      if (imgMatch && this.isValidImage(imgMatch[1])) {
+        logger.debug(`Found image from description for ${feedConfig.name}`, imgMatch[1]);
+        return imgMatch[1];
       }
     }
 
@@ -182,22 +188,15 @@ export class RSSParser {
     return undefined;
   }
 
-  private extractMediaContent(itemXml: string): string | null {
-    // NPR uses <media:content medium="image" url="...">
-    const mediaContentRegex = /<media:content[^>]*medium="image"[^>]*url="([^"]+)"/i;
-    const match = itemXml.match(mediaContentRegex);
-    if (match) {
-      return match[1];
-    }
+  private extractMediaContent(item: Record<string, unknown>): string | null {
+    const candidates = asArray(item['media:content'] as any);
 
-    // Also try without medium attribute
-    const mediaUrlRegex = /<media:content[^>]*url="([^"]+)"[^>]*>/i;
-    const urlMatch = itemXml.match(mediaUrlRegex);
-    if (urlMatch) {
-      return urlMatch[1];
-    }
+    // Prefer one explicitly marked as an image
+    const imageCandidate = candidates.find(candidate => attrOf(candidate, 'medium') === 'image');
+    const chosen = imageCandidate ?? candidates[0];
 
-    return null;
+    const url = chosen ? attrOf(chosen, 'url') : '';
+    return url || null;
   }
 }
 

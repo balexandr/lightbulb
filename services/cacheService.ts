@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { CACHE_CONFIG } from '@/constants/newsConfig';
-import { NewsItem } from '@/types/news';
+import { AIExplanation, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
 import { simpleHash } from '@/utils/textUtils';
 
 interface CachedExplanation {
-  explanation: any;
+  explanation: AIExplanation;
   timestamp: number;
   url: string;
 }
@@ -52,7 +52,7 @@ export class CacheService {
     return `${CACHE_CONFIG.EXPLANATION_PREFIX}${urlHash}`;
   }
 
-  async getExplanation(item: NewsItem): Promise<any | null> {
+  async getExplanation(item: NewsItem): Promise<AIExplanation | null> {
     try {
       const key = this.getCacheKey(item);
       const cached = await AsyncStorage.getItem(key);
@@ -77,7 +77,7 @@ export class CacheService {
     }
   }
 
-  async setExplanation(item: NewsItem, explanation: any): Promise<void> {
+  async setExplanation(item: NewsItem, explanation: AIExplanation): Promise<void> {
     try {
       const key = this.getCacheKey(item);
       const cached: CachedExplanation = {

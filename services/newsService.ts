@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-import { CACHE_CONFIG, DEFAULT_FILTER_CONFIG, REDDIT_SUBREDDITS, RSS_FEEDS, TRUSTED_NEWS_DOMAINS } from '@/constants/newsConfig';
+import { CACHE_CONFIG, DEFAULT_FILTER_CONFIG, REDDIT_SUBREDDITS, RSS_FEEDS, RSSFeedConfig, TRUSTED_NEWS_DOMAINS } from '@/constants/newsConfig';
 import { redditParser } from '@/services/parsers/redditParser';
 import { rssParser } from '@/services/parsers/rssParser';
 import { FilterConfig, NewsItem } from '@/types/news';
@@ -9,71 +9,83 @@ import { logger } from '@/utils/logger';
 import { getCorsProxyUrl, getRequestHeaders } from '@/utils/networkUtils';
 
 export class NewsService {
-  private async fetchRSSNews(): Promise<NewsItem[]> {
-    const allItems: NewsItem[] = [];
+  private async fetchSingleRSSFeed(feed: RSSFeedConfig): Promise<NewsItem[]> {
+    const feedUrl = getCorsProxyUrl(feed.url);
 
-    for (const feed of RSS_FEEDS) {
-      try {
-        const feedUrl = getCorsProxyUrl(feed.url);
-        
-        const response = await axios.get(feedUrl, {
-          timeout: 15000,
-          headers: getRequestHeaders(true),
-        });
+    const response = await axios.get(feedUrl, {
+      timeout: 15000,
+      headers: getRequestHeaders(true),
+    });
 
-        const items = rssParser.parseFeed(response.data, feed);
+    const items = rssParser.parseFeed(response.data, feed);
 
-        // Resolve OG images for items that had no image in the RSS XML
-        const itemsWithoutImages = items.filter(item => !item.imageUrl);
-        if (itemsWithoutImages.length > 0) {
-          logger.info(`Resolving OG images for ${itemsWithoutImages.length} ${feed.name} articles`);
-          await this.resolveArticleImages(itemsWithoutImages);
+    // Resolve OG images for items that had no image in the RSS XML
+    const itemsWithoutImages = items.filter(item => !item.imageUrl);
+    if (itemsWithoutImages.length > 0) {
+      logger.info(`Resolving OG images for ${itemsWithoutImages.length} ${feed.name} articles`);
+      await this.resolveArticleImages(itemsWithoutImages);
 
-          // Apply favicon fallback for any still unresolved
-          const fallback = rssParser.getLargeFavicon(feed);
-          for (const item of itemsWithoutImages) {
-            if (!item.imageUrl) {
-              item.imageUrl = fallback;
-            }
-          }
+      // Apply favicon fallback for any still unresolved
+      const fallback = rssParser.getLargeFavicon(feed);
+      for (const item of itemsWithoutImages) {
+        if (!item.imageUrl) {
+          item.imageUrl = fallback;
         }
-
-        allItems.push(...items);
-        
-        logger.success(`Fetched ${items.length} items from ${feed.name}`);
-      } catch (error: any) {
-        logger.error(`Failed to fetch RSS feed ${feed.name}:`, error.message);
       }
     }
+
+    logger.success(`Fetched ${items.length} items from ${feed.name}`);
+    return items;
+  }
+
+  private async fetchRSSNews(): Promise<NewsItem[]> {
+    const results = await Promise.allSettled(
+      RSS_FEEDS.map(feed => this.fetchSingleRSSFeed(feed))
+    );
+
+    const allItems: NewsItem[] = [];
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        allItems.push(...result.value);
+      } else {
+        logger.error(`Failed to fetch RSS feed ${RSS_FEEDS[index].name}:`, result.reason?.message ?? result.reason);
+      }
+    });
 
     return allItems;
   }
 
+  private async fetchSingleSubreddit(subreddit: typeof REDDIT_SUBREDDITS[number]): Promise<NewsItem[]> {
+    const redditUrl = `https://www.reddit.com/r/${subreddit}/hot.json?limit=25`;
+    const url = getCorsProxyUrl(redditUrl);
+
+    const response = await axios.get(url, {
+      timeout: 10000,
+      headers: getRequestHeaders(false),
+    });
+
+    const validPosts = redditParser.filterValidPosts(
+      response.data.data.children.map((child: any) => child.data)
+    );
+
+    const posts = validPosts.map(post => redditParser.parsePost(post, subreddit));
+    logger.success(`Fetched ${posts.length} posts from r/${subreddit}`);
+    return posts;
+  }
+
   private async fetchRedditNews(): Promise<NewsItem[]> {
+    const results = await Promise.allSettled(
+      REDDIT_SUBREDDITS.map(subreddit => this.fetchSingleSubreddit(subreddit))
+    );
+
     const allPosts: NewsItem[] = [];
-
-    for (const subreddit of REDDIT_SUBREDDITS) {
-      try {
-        const redditUrl = `https://www.reddit.com/r/${subreddit}/hot.json?limit=25`;
-        const url = getCorsProxyUrl(redditUrl);
-        
-        const response = await axios.get(url, {
-          timeout: 10000,
-          headers: getRequestHeaders(false),
-        });
-
-        const validPosts = redditParser.filterValidPosts(
-          response.data.data.children.map((child: any) => child.data)
-        );
-
-        const posts = validPosts.map(post => redditParser.parsePost(post, subreddit));
-        allPosts.push(...posts);
-        
-        logger.success(`Fetched ${posts.length} posts from r/${subreddit}`);
-      } catch (error: any) {
-        logger.error(`Failed to fetch r/${subreddit}:`, error.message);
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        allPosts.push(...result.value);
+      } else {
+        logger.error(`Failed to fetch r/${REDDIT_SUBREDDITS[index]}:`, result.reason?.message ?? result.reason);
       }
-    }
+    });
 
     return allPosts;
   }

@@ -28,4 +28,4 @@ export interface AIExplanation {
   why: string;
   impact: string;
   credibility: string;
-};
+}

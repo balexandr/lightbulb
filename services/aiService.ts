@@ -17,6 +17,7 @@ class AIService {
     if (apiKey) {
       this.openai = new OpenAI({
         apiKey,
+        dangerouslyAllowBrowser: true,
       });
       logger.info('OpenAI client initialized');
     } else {
@@ -134,7 +135,11 @@ Format as JSON with keys: summary, why, impact, credibility`;
         throw new Error('No response from OpenAI');
       }
 
-      const explanation = JSON.parse(content);
+      const parsed = JSON.parse(content);
+      if (!this.isAIExplanation(parsed)) {
+        throw new Error('OpenAI response did not match expected explanation shape');
+      }
+      const explanation = parsed;
       await cacheService.setExplanation(item, explanation);
       
       logger.success('Generated and cached new explanation');
@@ -149,6 +154,17 @@ Format as JSON with keys: summary, why, impact, credibility`;
       await cacheService.setExplanation(item, mockExplanation);
       return mockExplanation;
     }
+  }
+
+  private isAIExplanation(value: unknown): value is AIExplanation {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof (value as AIExplanation).summary === 'string' &&
+      typeof (value as AIExplanation).why === 'string' &&
+      typeof (value as AIExplanation).impact === 'string' &&
+      typeof (value as AIExplanation).credibility === 'string'
+    );
   }
 
   private getMockExplanation(item: NewsItem): AIExplanation {

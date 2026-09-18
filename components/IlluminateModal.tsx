@@ -1,5 +1,6 @@
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AIExplanation } from '@/types/news';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -10,12 +11,7 @@ interface IlluminateModalProps {
   title: string;
   loading?: boolean;
   fromCache?: boolean;
-  explanation?: {
-    summary: string;
-    why: string;
-    impact: string;
-    credibility: string;
-  };
+  explanation?: AIExplanation;
 }
 
 export function IlluminateModal({ visible, onClose, title, loading, fromCache, explanation }: IlluminateModalProps) {
@@ -56,7 +52,7 @@ export function IlluminateModal({ visible, onClose, title, loading, fromCache, e
             <>
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>📝 What's This About?</ThemedText>
+                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>📝 What&apos;s This About?</ThemedText>
                 </View>
                 <ThemedText style={styles.sectionContent}>{explanation.summary}</ThemedText>
               </View>
