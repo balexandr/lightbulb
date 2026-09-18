@@ -8,6 +8,10 @@ import { Platform } from 'react-native';
 const tintColorLight = '#0a7ea4';
 const tintColorDark = '#fff';
 
+// Shared brand accent for buttons/badges (Illuminate, filter chips).
+// Same value in light and dark mode.
+export const AccentColor = '#F59E0B';
+
 export const Colors = {
   light: {
     text: '#11181C',

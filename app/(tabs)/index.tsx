@@ -6,7 +6,7 @@ import { IlluminateModal } from '@/components/IlluminateModal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { DISABLED_BY_DEFAULT_SOURCES } from '@/constants/newsConfig';
-import { Colors } from '@/constants/theme';
+import { AccentColor, Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { aiService } from '@/services/aiService';
 import { cacheService } from '@/services/cacheService';
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   filterBadge: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: AccentColor,
     borderRadius: 12,
     minWidth: 24,
     height: 24,
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   illuminateText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#F59E0B',
+    color: AccentColor,
   },
   listContent: {
     paddingBottom: 20,

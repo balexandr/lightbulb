@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { AccentColor, Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectAllButton: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: AccentColor,
   },
   selectAllButtonText: {
     color: '#FFFFFF',
@@ -240,8 +240,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxSelected: {
-    backgroundColor: '#F59E0B',
-    borderColor: '#F59E0B',
+    backgroundColor: AccentColor,
+    borderColor: AccentColor,
   },
   checkmark: {
     color: '#FFFFFF',
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: '#F59E0B',
+    backgroundColor: AccentColor,
   },
   applyButtonText: {
     color: '#FFFFFF',
