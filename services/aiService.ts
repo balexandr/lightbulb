@@ -1,69 +1,16 @@
-import OpenAI from 'openai';
-
-import { API_CONFIG } from '@/constants/newsConfig';
 import { AIExplanation, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
 
 import { cacheService } from './cacheService';
-import { preferencesService, UserPreferences } from './preferencesService';
+import { preferencesService } from './preferencesService';
+
+// On web the /api/illuminate route is same-origin. Native builds have no
+// origin of their own, so they need the deployed server's absolute URL.
+function getApiBaseUrl(): string {
+  return process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+}
 
 class AIService {
-  private openai: OpenAI | null = null;
-  private lastRequestTime = 0;
-
-  constructor() {
-    const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-    
-    if (apiKey) {
-      this.openai = new OpenAI({
-        apiKey,
-        dangerouslyAllowBrowser: true,
-      });
-      logger.info('OpenAI client initialized');
-    } else {
-      logger.warn('OpenAI API key not found, using mock data');
-    }
-  }
-
-  private async rateLimit(): Promise<void> {
-    const now = Date.now();
-    const timeSinceLastRequest = now - this.lastRequestTime;
-    
-    if (timeSinceLastRequest < API_CONFIG.RATE_LIMIT_MS) {
-      const waitTime = API_CONFIG.RATE_LIMIT_MS - timeSinceLastRequest;
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-    
-    this.lastRequestTime = Date.now();
-  }
-
-  private buildUserContext(preferences: UserPreferences): string {
-    const context: string[] = [];
-    
-    if (preferences.politicalStandpoint) {
-      const standpoints = {
-        progressive: 'progressive/left-leaning perspective',
-        liberal: 'liberal perspective',
-        moderate: 'moderate/centrist perspective',
-        conservative: 'conservative perspective',
-        libertarian: 'libertarian perspective',
-      };
-      context.push(`political perspective: ${standpoints[preferences.politicalStandpoint]}`);
-    }
-    
-    if (preferences.ageRange) {
-      context.push(`age range: ${preferences.ageRange}`);
-    }
-    
-    if (preferences.location) {
-      context.push(`location: ${preferences.location}`);
-    }
-    
-    return context.length > 0 
-      ? `\n\nUser context: ${context.join(', ')}`
-      : '';
-  }
-
   async explainNews(item: NewsItem): Promise<AIExplanation> {
     // Check cache first
     logger.debug('Checking cache for', item.url);
@@ -72,99 +19,41 @@ class AIService {
       logger.success('Using cached explanation');
       return cached;
     }
-    
+
     logger.info('No cache found, generating new explanation');
 
-    if (!this.openai) {
-      logger.info('Using mock explanation (no API key)');
-      const mockExplanation = this.getMockExplanation(item);
-      await cacheService.setExplanation(item, mockExplanation);
-      return mockExplanation;
-    }
-
     try {
-      await this.rateLimit();
-      
       const preferences = await preferencesService.getPreferences();
-      const userContext = this.buildUserContext(preferences);
-      
-      let impactGuidance = '';
-      if (preferences.politicalStandpoint || preferences.ageRange) {
-        const aspects = [];
-        if (preferences.politicalStandpoint) {
-          aspects.push(`a ${preferences.politicalStandpoint} perspective`);
-        }
-        if (preferences.ageRange) {
-          aspects.push(`someone aged ${preferences.ageRange}`);
-        }
-        impactGuidance = ` - consider how this might be viewed from ${aspects.join(' and ')} and its relevance to them`;
-      }
-      
-      const prompt = `Analyze this news headline and provide context:
 
-Title: ${item.title}
-Source: ${item.source.name}
-${item.domain ? `Domain: ${item.domain}` : ''}${userContext}
-
-Please provide:
-1. A brief summary (2-3 sentences)
-2. Why this matters (context and background)
-3. Potential impact or implications${impactGuidance}
-4. Source credibility assessment
-
-Format as JSON with keys: summary, why, impact, credibility`;
-
-      const response = await this.openai.chat.completions.create({
-        model: API_CONFIG.OPENAI_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: `You are a helpful news analyst who provides clear, balanced context about news stories. When user preferences are provided, tailor the "impact" section to be relevant to their perspective and demographic while remaining factual and unbiased in other sections. Focus on facts and verifiable information.`,
+      const response = await fetch(`${getApiBaseUrl()}/api/illuminate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item: {
+            title: item.title,
+            domain: item.domain,
+            source: { name: item.source.name },
           },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: API_CONFIG.MAX_TOKENS,
-        temperature: 0.7,
+          preferences,
+        }),
       });
 
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error('No response from OpenAI');
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.error ?? `Illuminate request failed (${response.status})`);
       }
 
-      const parsed = JSON.parse(content);
-      if (!this.isAIExplanation(parsed)) {
-        throw new Error('OpenAI response did not match expected explanation shape');
-      }
-      const explanation = parsed;
+      const explanation: AIExplanation = await response.json();
       await cacheService.setExplanation(item, explanation);
-      
+
       logger.success('Generated and cached new explanation');
       return explanation;
     } catch (error: any) {
-      if (!error.message?.includes('quota')) {
-        logger.error('Error calling OpenAI:', error.message);
-      } else {
-        logger.info('OpenAI quota exceeded, using mock data');
-      }
+      logger.info('Falling back to mock explanation:', error.message);
       const mockExplanation = this.getMockExplanation(item);
       await cacheService.setExplanation(item, mockExplanation);
       return mockExplanation;
     }
-  }
-
-  private isAIExplanation(value: unknown): value is AIExplanation {
-    return (
-      typeof value === 'object' &&
-      value !== null &&
-      typeof (value as AIExplanation).summary === 'string' &&
-      typeof (value as AIExplanation).why === 'string' &&
-      typeof (value as AIExplanation).impact === 'string' &&
-      typeof (value as AIExplanation).credibility === 'string'
-    );
   }
 
   private getMockExplanation(item: NewsItem): AIExplanation {
