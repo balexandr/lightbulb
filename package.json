@@ -12,7 +12,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "build": "expo export -p web",
-    "serve": "node server.js"
+    "serve": "node server.js",
+    "golden-set-check": "node scripts/golden-set-check.js"
   },
   "engines": {
     "node": ">=20.16.0"
