@@ -6,7 +6,7 @@ services:
     buildCommand: npm ci && npm run build
     startCommand: npm run serve
     envVars:
-      - key: OPENAI_API_KEY
+      - key: ANTHROPIC_API_KEY
         sync: false
       - key: NODE_VERSION
         value: 22.23.1

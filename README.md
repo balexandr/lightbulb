@@ -28,13 +28,13 @@ You can start developing by editing the files inside the **app** directory. This
 ## Deploying the web server (Render)
 
 `app.json`'s `web.output` is `"server"` because `app/api/illuminate+api.ts`
-is a real API route (proxies OpenAI so the key never reaches the client) —
+is a real API route (proxies Claude so the key never reaches the client) —
 that only works when the web build runs as a Node server, not static files.
 
 This repo includes a `render.yaml` blueprint:
 
 1. On Render, "New" → "Blueprint", point it at this repo.
-2. Set `OPENAI_API_KEY` in the service's environment settings (marked
+2. Set `ANTHROPIC_API_KEY` in the service's environment settings (marked
    `sync: false` in the blueprint, so Render prompts for it rather than
    storing it in git).
 3. Deploy. `npm run build` (`expo export -p web`) produces `dist/client`

@@ -1,11 +1,20 @@
+import Anthropic from '@anthropic-ai/sdk';
+
 import { POST } from '@/app/api/illuminate+api';
 
-const mockCreate = jest.fn();
+const mockParse = jest.fn();
 
-jest.mock('openai', () => {
-  return jest.fn().mockImplementation(() => ({
-    chat: { completions: { create: mockCreate } },
+jest.mock('@anthropic-ai/sdk', () => {
+  const actual = jest.requireActual('@anthropic-ai/sdk');
+  const MockAnthropic = jest.fn().mockImplementation(() => ({
+    messages: { parse: mockParse },
   }));
+  // Static error classes (RateLimitError, APIError, ...) live on the real
+  // class's prototype chain, not as own properties - point the mock's
+  // prototype at the real default export so `Anthropic.RateLimitError`
+  // still resolves to the real class, both here and in the route.
+  Object.setPrototypeOf(MockAnthropic, actual.default);
+  return { __esModule: true, default: MockAnthropic };
 });
 
 const explanation = {
@@ -23,24 +32,24 @@ function makeRequest(body: unknown): Request {
 }
 
 describe('POST /api/illuminate', () => {
-  const originalKey = process.env.OPENAI_API_KEY;
+  const originalKey = process.env.ANTHROPIC_API_KEY;
 
   afterEach(() => {
-    process.env.OPENAI_API_KEY = originalKey;
+    process.env.ANTHROPIC_API_KEY = originalKey;
     jest.clearAllMocks();
   });
 
   it('returns 503 when no server-side API key is configured', async () => {
-    delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
 
     const response = await POST(makeRequest({ item: { title: 't', source: { name: 'BBC' } } }));
 
     expect(response.status).toBe(503);
-    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockParse).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid JSON', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
     const request = new Request('http://localhost/api/illuminate', { method: 'POST', body: 'not-json' });
 
     const response = await POST(request);
@@ -48,17 +57,15 @@ describe('POST /api/illuminate', () => {
   });
 
   it('returns 400 when item title or source is missing', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
 
     const response = await POST(makeRequest({ item: { title: '', source: { name: 'BBC' } } }));
     expect(response.status).toBe(400);
   });
 
   it('returns the parsed explanation on success', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    mockCreate.mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify(explanation) } }],
-    });
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValue({ parsed_output: explanation });
 
     const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' }, domain: 'bbc.com' } }));
 
@@ -66,27 +73,29 @@ describe('POST /api/illuminate', () => {
     expect(await response.json()).toEqual(explanation);
   });
 
-  it('returns 502 when OpenAI responds with a malformed shape', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    mockCreate.mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify({ summary: 'only summary' }) } }],
-    });
+  it('returns 502 when Claude responds with a malformed shape', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValue({ parsed_output: null });
 
     const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
     expect(response.status).toBe(502);
   });
 
-  it('propagates a 429 when OpenAI rate-limits the request', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    mockCreate.mockRejectedValue(Object.assign(new Error('rate limited'), { status: 429 }));
+  it('propagates a 429 when Claude rate-limits the request', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockRejectedValue(
+      new Anthropic.RateLimitError(429, { message: 'rate limited' }, 'rate limited', new Headers())
+    );
 
     const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
     expect(response.status).toBe(429);
   });
 
-  it('returns 502 for any other OpenAI failure', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    mockCreate.mockRejectedValue(new Error('boom'));
+  it('returns 502 for any other Claude API failure', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockRejectedValue(
+      new Anthropic.APIError(500, { message: 'boom' }, 'boom', new Headers())
+    );
 
     const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
     expect(response.status).toBe(502);

@@ -1,10 +1,18 @@
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import { z } from 'zod';
 
-import { AIExplanation } from '@/types/news';
 import { UserPreferences } from '@/services/preferencesService';
 
-const OPENAI_MODEL = 'gpt-4o-mini';
-const MAX_TOKENS = 800;
+const CLAUDE_MODEL = 'claude-haiku-4-5';
+const MAX_TOKENS = 1024;
+
+const AIExplanationSchema = z.object({
+  summary: z.string(),
+  why: z.string(),
+  impact: z.string(),
+  credibility: z.string(),
+});
 
 interface IlluminateRequestItem {
   title: string;
@@ -44,19 +52,8 @@ function buildUserContext(preferences: UserPreferences): string {
     : '';
 }
 
-function isAIExplanation(value: unknown): value is AIExplanation {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as AIExplanation).summary === 'string' &&
-    typeof (value as AIExplanation).why === 'string' &&
-    typeof (value as AIExplanation).impact === 'string' &&
-    typeof (value as AIExplanation).credibility === 'string'
-  );
-}
-
 export async function POST(request: Request): Promise<Response> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return Response.json({ error: 'AI explanations are not configured on this server.' }, { status: 503 });
   }
@@ -97,42 +94,34 @@ Please provide:
 1. A brief summary (2-3 sentences)
 2. Why this matters (context and background)
 3. Potential impact or implications${impactGuidance}
-4. Source credibility assessment
+4. Source credibility assessment`;
 
-Format as JSON with keys: summary, why, impact, credibility`;
-
-  const openai = new OpenAI({ apiKey });
+  const anthropic = new Anthropic({ apiKey });
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: OPENAI_MODEL,
-      messages: [
-        {
-          role: 'system',
-          content: `You are a helpful news analyst who provides clear, balanced context about news stories. When user preferences are provided, tailor the "impact" section to be relevant to their perspective and demographic while remaining factual and unbiased in other sections. Focus on facts and verifiable information.`,
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+    const response = await anthropic.messages.parse({
+      model: CLAUDE_MODEL,
       max_tokens: MAX_TOKENS,
       temperature: 0.7,
+      system: 'You are a helpful news analyst who provides clear, balanced context about news stories. When user preferences are provided, tailor the "impact" section to be relevant to their perspective and demographic while remaining factual and unbiased in other sections. Focus on facts and verifiable information.',
+      messages: [{ role: 'user', content: prompt }],
+      output_config: {
+        format: zodOutputFormat(AIExplanationSchema),
+      },
     });
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      return Response.json({ error: 'No response from OpenAI.' }, { status: 502 });
+    if (!response.parsed_output) {
+      return Response.json({ error: 'Claude response did not match expected explanation shape.' }, { status: 502 });
     }
 
-    const parsed = JSON.parse(content);
-    if (!isAIExplanation(parsed)) {
-      return Response.json({ error: 'OpenAI response did not match expected explanation shape.' }, { status: 502 });
+    return Response.json(response.parsed_output);
+  } catch (error) {
+    if (error instanceof Anthropic.RateLimitError) {
+      return Response.json({ error: error.message }, { status: 429 });
     }
-
-    return Response.json(parsed);
-  } catch (error: any) {
-    const status = error?.status === 429 ? 429 : 502;
-    return Response.json({ error: error?.message ?? 'OpenAI request failed.' }, { status });
+    if (error instanceof Anthropic.APIError) {
+      return Response.json({ error: error.message }, { status: 502 });
+    }
+    return Response.json({ error: 'Claude request failed.' }, { status: 502 });
   }
 }
