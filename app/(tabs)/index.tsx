@@ -77,8 +77,10 @@ export default function HomeScreen() {
 
   // Intentionally mount-only: loadNews reads selectedSources but we only
   // want the initial fetch here, not a refetch every time filters change.
+  // forceRefresh is false so a fresh cache from a previous session is used
+  // instead of always hitting the network on cold start.
   useEffect(() => {
-    loadNews(true);
+    loadNews(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
