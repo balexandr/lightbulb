@@ -11,6 +11,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { aiService } from '@/services/aiService';
 import { cacheService } from '@/services/cacheService';
 import { newsService } from '@/services/newsService';
+import { preferencesService } from '@/services/preferencesService';
 import { AIExplanation, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
 
@@ -110,11 +111,13 @@ export default function HomeScreen() {
     setFromCache(false);
 
     try {
-      const cached = await cacheService.getExplanation(item);
-      if (cached) {
+      const preferences = await preferencesService.getPreferences();
+      const bucket = preferencesService.getPreferenceBucket(preferences);
+      const cached = await cacheService.getExplanation(item, bucket);
+      if (cached.fact && cached.relevance) {
         setFromCache(true);
       }
-      
+
       const result = await aiService.explainNews(item);
       setExplanation(result);
     } catch (error) {

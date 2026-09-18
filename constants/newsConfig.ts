@@ -111,7 +111,10 @@ export const TRUSTED_NEWS_DOMAINS = [
 
 export const CACHE_CONFIG = {
   NEWS_KEY: '@lightbulb_news_cache',
-  EXPLANATION_PREFIX: '@lightbulb_explanation_',
+  // Two independent prefixes (§15.3/§15.6): fact is cached per-article only
+  // and shared by every reader; relevance is cached per-article-per-bucket.
+  FACT_PREFIX: '@lightbulb_fact_',
+  RELEVANCE_PREFIX: '@lightbulb_relevance_',
   INDEX_KEY: '@lightbulb_cache_index',
   NEWS_DURATION: 5 * 60 * 1000, // 5 minutes
   EXPLANATION_EXPIRY_DAYS: 7,

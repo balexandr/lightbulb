@@ -46,7 +46,7 @@ function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
 describe('HomeScreen', () => {
   beforeEach(() => {
     mockNewsService.clearCache.mockResolvedValue();
-    mockCacheService.getExplanation.mockResolvedValue(null);
+    mockCacheService.getExplanation.mockResolvedValue({ fact: null, relevance: null });
     jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined as any);
   });

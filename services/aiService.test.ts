@@ -1,24 +1,28 @@
-import { NewsItem, AIExplanation } from '@/types/news';
+import { AIExplanation, FactLayer, NewsItem, RelevanceLayer } from '@/types/news';
 
 import { aiService } from './aiService';
 import { cacheService } from './cacheService';
-import { preferencesService } from './preferencesService';
+import { PreferenceBucket, preferencesService } from './preferencesService';
 
 jest.mock('./cacheService', () => ({
   cacheService: {
     getExplanation: jest.fn(),
-    setExplanation: jest.fn(),
+    setFact: jest.fn(),
+    setRelevance: jest.fn(),
   },
 }));
 
 jest.mock('./preferencesService', () => ({
   preferencesService: {
     getPreferences: jest.fn(),
+    getPreferenceBucket: jest.fn(),
   },
 }));
 
 const mockCacheService = cacheService as jest.Mocked<typeof cacheService>;
 const mockPreferencesService = preferencesService as jest.Mocked<typeof preferencesService>;
+
+const unspecifiedBucket: PreferenceBucket = { age: 'unspecified', stance: 'unspecified', region: 'unspecified' };
 
 function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
   return {
@@ -32,16 +36,14 @@ function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
   };
 }
 
-const explanation: AIExplanation = {
-  summary: 'summary',
-  why: 'why',
-  impact: 'impact',
-  credibility: 'credibility',
-};
+const fact: FactLayer = { summary: 'summary', credibility: 'credibility' };
+const relevance: RelevanceLayer = { why: 'why', impact: 'impact' };
+const explanation: AIExplanation = { ...fact, ...relevance };
 
 describe('AIService.explainNews', () => {
   beforeEach(() => {
     mockPreferencesService.getPreferences.mockResolvedValue({});
+    mockPreferencesService.getPreferenceBucket.mockReturnValue(unspecifiedBucket);
     global.fetch = jest.fn();
   });
 
@@ -49,8 +51,8 @@ describe('AIService.explainNews', () => {
     jest.clearAllMocks();
   });
 
-  it('returns the cached explanation without calling fetch', async () => {
-    mockCacheService.getExplanation.mockResolvedValue(explanation);
+  it('returns the cached explanation without calling fetch when both layers are cached', async () => {
+    mockCacheService.getExplanation.mockResolvedValue({ fact, relevance });
 
     const result = await aiService.explainNews(makeItem());
 
@@ -58,12 +60,12 @@ describe('AIService.explainNews', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('calls /api/illuminate with the item and preferences, and caches the result', async () => {
-    mockCacheService.getExplanation.mockResolvedValue(null);
-    mockPreferencesService.getPreferences.mockResolvedValue({ politicalStandpoint: 'moderate' });
+  it('requests both layers on a full cache miss, and caches both independently', async () => {
+    mockCacheService.getExplanation.mockResolvedValue({ fact: null, relevance: null });
+    mockPreferencesService.getPreferenceBucket.mockReturnValue({ ...unspecifiedBucket, stance: 'moderate' as any });
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => explanation,
+      json: async () => ({ fact, relevance }),
     });
 
     const item = makeItem();
@@ -77,15 +79,47 @@ describe('AIService.explainNews', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           item: { title: item.title, domain: item.domain, source: { name: item.source.name } },
-          preferences: { politicalStandpoint: 'moderate' },
+          bucket: { ...unspecifiedBucket, stance: 'moderate' },
+          needFact: true,
+          needRelevance: true,
+          factSummary: undefined,
         }),
       })
     );
-    expect(mockCacheService.setExplanation).toHaveBeenCalledWith(item, explanation);
+    expect(mockCacheService.setFact).toHaveBeenCalledWith(item, fact);
+    expect(mockCacheService.setRelevance).toHaveBeenCalledWith(item, { ...unspecifiedBucket, stance: 'moderate' }, relevance);
+  });
+
+  it('requests only the missing layer on a partial cache hit', async () => {
+    mockCacheService.getExplanation.mockResolvedValue({ fact, relevance: null });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ relevance }),
+    });
+
+    const item = makeItem();
+    const result = await aiService.explainNews(item);
+
+    expect(result).toEqual(explanation);
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/illuminate',
+      expect.objectContaining({
+        body: JSON.stringify({
+          item: { title: item.title, domain: item.domain, source: { name: item.source.name } },
+          bucket: unspecifiedBucket,
+          needFact: false,
+          needRelevance: true,
+          factSummary: fact.summary,
+        }),
+      })
+    );
+    // The already-cached fact layer isn't re-cached - only what came back fresh.
+    expect(mockCacheService.setFact).not.toHaveBeenCalled();
+    expect(mockCacheService.setRelevance).toHaveBeenCalledWith(item, unspecifiedBucket, relevance);
   });
 
   it('falls back to a mock explanation when the request fails', async () => {
-    mockCacheService.getExplanation.mockResolvedValue(null);
+    mockCacheService.getExplanation.mockResolvedValue({ fact: null, relevance: null });
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: false,
       status: 503,
@@ -96,11 +130,12 @@ describe('AIService.explainNews', () => {
     const result = await aiService.explainNews(item);
 
     expect(result.summary).toContain(item.title);
-    expect(mockCacheService.setExplanation).toHaveBeenCalledWith(item, result);
+    expect(mockCacheService.setFact).toHaveBeenCalledWith(item, { summary: result.summary, credibility: result.credibility });
+    expect(mockCacheService.setRelevance).toHaveBeenCalledWith(item, unspecifiedBucket, { why: result.why, impact: result.impact });
   });
 
   it('falls back to a mock explanation when fetch itself throws (e.g. offline)', async () => {
-    mockCacheService.getExplanation.mockResolvedValue(null);
+    mockCacheService.getExplanation.mockResolvedValue({ fact: null, relevance: null });
     (global.fetch as jest.Mock).mockRejectedValue(new Error('Network request failed'));
 
     const item = makeItem();
@@ -110,7 +145,7 @@ describe('AIService.explainNews', () => {
   });
 
   it('gives Reddit sources a Reddit-specific credibility note in the mock', async () => {
-    mockCacheService.getExplanation.mockResolvedValue(null);
+    mockCacheService.getExplanation.mockResolvedValue({ fact: null, relevance: null });
     (global.fetch as jest.Mock).mockRejectedValue(new Error('down'));
 
     const item = makeItem({ source: { name: 'r/worldnews', type: 'reddit' } });

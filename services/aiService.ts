@@ -1,25 +1,33 @@
-import { AIExplanation, NewsItem } from '@/types/news';
+import { AIExplanation, FactLayer, NewsItem, RelevanceLayer } from '@/types/news';
 import { logger } from '@/utils/logger';
 import { getApiBaseUrl } from '@/utils/networkUtils';
 
 import { cacheService } from './cacheService';
 import { preferencesService } from './preferencesService';
 
+interface IlluminateResponseBody {
+  fact?: FactLayer;
+  relevance?: RelevanceLayer;
+}
+
 class AIService {
   async explainNews(item: NewsItem): Promise<AIExplanation> {
-    // Check cache first
+    const preferences = await preferencesService.getPreferences();
+    const bucket = preferencesService.getPreferenceBucket(preferences);
+
     logger.debug('Checking cache for', item.url);
-    const cached = await cacheService.getExplanation(item);
-    if (cached) {
+    const { fact: cachedFact, relevance: cachedRelevance } = await cacheService.getExplanation(item, bucket);
+
+    if (cachedFact && cachedRelevance) {
       logger.success('Using cached explanation');
-      return cached;
+      return { ...cachedFact, ...cachedRelevance };
     }
 
-    logger.info('No cache found, generating new explanation');
+    const needFact = !cachedFact;
+    const needRelevance = !cachedRelevance;
+    logger.info(`Cache ${needFact ? 'miss' : 'hit'} on fact, ${needRelevance ? 'miss' : 'hit'} on relevance - requesting only what's missing`);
 
     try {
-      const preferences = await preferencesService.getPreferences();
-
       const response = await fetch(`${getApiBaseUrl()}/api/illuminate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,7 +37,12 @@ class AIService {
             domain: item.domain,
             source: { name: item.source.name },
           },
-          preferences,
+          bucket,
+          needFact,
+          needRelevance,
+          // Lets the server build the relevance prompt's context without
+          // regenerating a fact it doesn't need to (§15.5).
+          factSummary: cachedFact?.summary,
         }),
       });
 
@@ -38,15 +51,28 @@ class AIService {
         throw new Error(errorBody.error ?? `Illuminate request failed (${response.status})`);
       }
 
-      const explanation: AIExplanation = await response.json();
-      await cacheService.setExplanation(item, explanation);
+      const result: IlluminateResponseBody = await response.json();
+      const fact = result.fact ?? cachedFact;
+      const relevance = result.relevance ?? cachedRelevance;
+
+      if (!fact || !relevance) {
+        throw new Error('Illuminate response was missing a layer that should have been present.');
+      }
+
+      if (result.fact) {
+        await cacheService.setFact(item, result.fact);
+      }
+      if (result.relevance) {
+        await cacheService.setRelevance(item, bucket, result.relevance);
+      }
 
       logger.success('Generated and cached new explanation');
-      return explanation;
+      return { ...fact, ...relevance };
     } catch (error: any) {
       logger.info('Falling back to mock explanation:', error.message);
       const mockExplanation = this.getMockExplanation(item);
-      await cacheService.setExplanation(item, mockExplanation);
+      await cacheService.setFact(item, { summary: mockExplanation.summary, credibility: mockExplanation.credibility });
+      await cacheService.setRelevance(item, bucket, { why: mockExplanation.why, impact: mockExplanation.impact });
       return mockExplanation;
     }
   }
@@ -74,7 +100,7 @@ class AIService {
       return 'Reddit posts represent community discussions. Always verify claims through primary sources.';
     }
 
-    return credibilityNotes[sourceName] || 
+    return credibilityNotes[sourceName] ||
       'This source should be cross-referenced with other reputable news outlets for verification.';
   }
 }

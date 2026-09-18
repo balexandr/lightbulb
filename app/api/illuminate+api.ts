@@ -2,7 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 
-import { UserPreferences } from '@/services/preferencesService';
+import { PreferenceBucket } from '@/services/preferencesService';
+import { FactLayer, RelevanceLayer } from '@/types/news';
 import { RateLimiter } from '@/utils/rateLimiter';
 
 const CLAUDE_MODEL = 'claude-haiku-4-5';
@@ -23,12 +24,39 @@ function getClientIp(request: Request): string {
   return 'unknown';
 }
 
-const AIExplanationSchema = z.object({
+const FactLayerSchema = z.object({
   summary: z.string(),
-  why: z.string(),
-  impact: z.string(),
   credibility: z.string(),
 });
+
+const RelevanceLayerSchema = z.object({
+  why: z.string(),
+  impact: z.string(),
+});
+
+// Fixed, never touched by user input - see docs/TECHNICAL_GUIDE.md §14.2.
+// This layer never sees bucket/preference data at all, so it's identical
+// (and cacheable) regardless of who's asking.
+const FACT_SYSTEM_PROMPT = `You are a neutral news analyst. Given a news headline, its source, and domain, produce a factual summary and a source credibility assessment.
+
+Rules:
+- State facts once, consistently - this must read identically no matter who asks.
+- Never speculate beyond what the headline states.
+- Never reproduce more than a short paraphrase of the headline - no verbatim article text, even if you recognize the article from training data.`;
+
+// Fixed system rules for the relevance layer, plus the §14.5 guardrail -
+// the actual line between "why you'd care" (salience, allowed) and "what
+// you should think" (persuasion, forbidden). This is a hard rule, not a
+// style preference - re-read docs/TECHNICAL_GUIDE.md §14.5 before touching it.
+const RELEVANCE_SYSTEM_PROMPT = `You are a news analyst explaining why a story is relevant to a specific reader, using only their self-selected, broad age range and general political-leaning preference. Never treat these as more precise than they are, and never introduce anything beyond what's given.
+
+Given the story's summary and the reader's context, explain (1) why this story is relevant to someone in their situation, and (2) its potential real-world impact or implications for them.
+
+Hard rule: state facts about the story's relevance to the reader's context and stop there. Never state or imply what opinion, position, or reaction the reader should have.
+- Correct (salience): "This matters to you because a Democratic state senator representing your area is pushing back on data center development, a local infrastructure issue."
+- Wrong (persuasion): "As a Democrat, you'll likely support this senator's opposition." This assigns the reader an opinion they never gave you.
+
+If the reader's age and political leaning are both unspecified, give a general, audience-agnostic explanation of who is affected and how - no persuasive framing, and don't default to assuming a "moderate" or centrist reader.`;
 
 interface IlluminateRequestItem {
   title: string;
@@ -38,34 +66,93 @@ interface IlluminateRequestItem {
 
 interface IlluminateRequestBody {
   item: IlluminateRequestItem;
-  preferences?: UserPreferences;
+  bucket?: PreferenceBucket;
+  needFact?: boolean;
+  needRelevance?: boolean;
+  // Required when needRelevance is true and needFact is false, so the
+  // relevance call has fact context without re-deriving facts itself (§15.5).
+  factSummary?: string;
 }
 
-function buildUserContext(preferences: UserPreferences): string {
-  const context: string[] = [];
-
-  if (preferences.politicalStandpoint) {
-    const standpoints = {
-      progressive: 'progressive/left-leaning perspective',
-      liberal: 'liberal perspective',
-      moderate: 'moderate/centrist perspective',
-      conservative: 'conservative perspective',
-      libertarian: 'libertarian perspective',
-    };
-    context.push(`political perspective: ${standpoints[preferences.politicalStandpoint]}`);
+function anthropicErrorResponse(error: unknown): Response {
+  if (error instanceof Anthropic.RateLimitError) {
+    return Response.json({ error: error.message }, { status: 429 });
   }
-
-  if (preferences.ageRange) {
-    context.push(`age range: ${preferences.ageRange}`);
+  if (error instanceof Anthropic.APIError) {
+    return Response.json({ error: error.message }, { status: 502 });
   }
+  return Response.json({ error: 'Claude request failed.' }, { status: 502 });
+}
 
-  if (preferences.location) {
-    context.push(`location: ${preferences.location}`);
+async function generateFact(anthropic: Anthropic, item: IlluminateRequestItem): Promise<FactLayer | Response> {
+  const prompt = `Title: ${item.title}
+Source: ${item.source.name}
+${item.domain ? `Domain: ${item.domain}` : ''}
+
+Provide:
+1. A brief, neutral 2-3 sentence summary of what this headline describes.
+2. A brief, evidence-based assessment of this source's general credibility.`;
+
+  try {
+    const response = await anthropic.messages.parse({
+      model: CLAUDE_MODEL,
+      max_tokens: MAX_TOKENS,
+      temperature: 0.7,
+      system: FACT_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: prompt }],
+      output_config: { format: zodOutputFormat(FactLayerSchema) },
+    });
+
+    if (!response.parsed_output) {
+      return Response.json({ error: 'Claude fact response did not match expected shape.' }, { status: 502 });
+    }
+    return response.parsed_output;
+  } catch (error) {
+    return anthropicErrorResponse(error);
   }
+}
 
-  return context.length > 0
-    ? `\n\nUser context: ${context.join(', ')}`
-    : '';
+async function generateRelevance(
+  anthropic: Anthropic,
+  factSummary: string,
+  bucket: PreferenceBucket
+): Promise<RelevanceLayer | Response> {
+  const bucketLines: string[] = [];
+  if (bucket.age !== 'unspecified') bucketLines.push(`age range: ${bucket.age}`);
+  if (bucket.stance !== 'unspecified') bucketLines.push(`general political leaning: ${bucket.stance}`);
+  if (bucket.region !== 'unspecified') bucketLines.push(`region: ${bucket.region}`);
+
+  const readerContext = bucketLines.length > 0
+    ? `Reader context: ${bucketLines.join(', ')}.`
+    : `Reader context: unspecified - give a general, audience-agnostic explanation.`;
+
+  const prompt = `Article summary: ${factSummary}
+
+${readerContext}
+
+Explain why this story is relevant to this reader and its potential impact, following the system rules above.`;
+
+  try {
+    const response = await anthropic.messages.parse({
+      model: CLAUDE_MODEL,
+      max_tokens: MAX_TOKENS,
+      temperature: 0.7,
+      system: RELEVANCE_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: prompt }],
+      output_config: { format: zodOutputFormat(RelevanceLayerSchema) },
+    });
+
+    if (!response.parsed_output) {
+      return Response.json({ error: 'Claude relevance response did not match expected shape.' }, { status: 502 });
+    }
+    return response.parsed_output;
+  } catch (error) {
+    return anthropicErrorResponse(error);
+  }
+}
+
+function isResponse(value: unknown): value is Response {
+  return value instanceof Response;
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -89,63 +176,48 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Invalid request body.' }, { status: 400 });
   }
 
-  const { item, preferences = {} } = body;
+  const { item, factSummary } = body;
   if (!item?.title || !item?.source?.name) {
     return Response.json({ error: 'item.title and item.source.name are required.' }, { status: 400 });
   }
 
-  const userContext = buildUserContext(preferences);
+  const needFact = body.needFact ?? true;
+  const needRelevance = body.needRelevance ?? true;
+  const bucket: PreferenceBucket = body.bucket ?? { age: 'unspecified', stance: 'unspecified', region: 'unspecified' };
 
-  let impactGuidance = '';
-  if (preferences.politicalStandpoint || preferences.ageRange) {
-    const aspects: string[] = [];
-    if (preferences.politicalStandpoint) {
-      aspects.push(`a ${preferences.politicalStandpoint} perspective`);
-    }
-    if (preferences.ageRange) {
-      aspects.push(`someone aged ${preferences.ageRange}`);
-    }
-    impactGuidance = ` - consider how this might be viewed from ${aspects.join(' and ')} and its relevance to them`;
+  if (!needFact && !needRelevance) {
+    return Response.json({ error: 'At least one of needFact or needRelevance must be true.' }, { status: 400 });
   }
-
-  const prompt = `Analyze this news headline and provide context:
-
-Title: ${item.title}
-Source: ${item.source.name}
-${item.domain ? `Domain: ${item.domain}` : ''}${userContext}
-
-Please provide:
-1. A brief summary (2-3 sentences)
-2. Why this matters (context and background)
-3. Potential impact or implications${impactGuidance}
-4. Source credibility assessment`;
+  if (needRelevance && !needFact && !factSummary) {
+    return Response.json(
+      { error: 'factSummary is required when requesting relevance without also requesting fact.' },
+      { status: 400 }
+    );
+  }
 
   const anthropic = new Anthropic({ apiKey });
 
-  try {
-    const response = await anthropic.messages.parse({
-      model: CLAUDE_MODEL,
-      max_tokens: MAX_TOKENS,
-      temperature: 0.7,
-      system: 'You are a helpful news analyst who provides clear, balanced context about news stories. When user preferences are provided, tailor the "impact" section to be relevant to their perspective and demographic while remaining factual and unbiased in other sections. Focus on facts and verifiable information.',
-      messages: [{ role: 'user', content: prompt }],
-      output_config: {
-        format: zodOutputFormat(AIExplanationSchema),
-      },
-    });
-
-    if (!response.parsed_output) {
-      return Response.json({ error: 'Claude response did not match expected explanation shape.' }, { status: 502 });
+  let fact: FactLayer | undefined;
+  if (needFact) {
+    const result = await generateFact(anthropic, item);
+    if (isResponse(result)) {
+      return result;
     }
-
-    return Response.json(response.parsed_output);
-  } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) {
-      return Response.json({ error: error.message }, { status: 429 });
-    }
-    if (error instanceof Anthropic.APIError) {
-      return Response.json({ error: error.message }, { status: 502 });
-    }
-    return Response.json({ error: 'Claude request failed.' }, { status: 502 });
+    fact = result;
   }
+
+  let relevance: RelevanceLayer | undefined;
+  if (needRelevance) {
+    // Prefer the summary we just generated (this request) over the
+    // client-supplied one, so the relevance framing never drifts from
+    // stale cached facts when both are being (re)generated together.
+    const summaryForContext = fact?.summary ?? factSummary!;
+    const result = await generateRelevance(anthropic, summaryForContext, bucket);
+    if (isResponse(result)) {
+      return result;
+    }
+    relevance = result;
+  }
+
+  return Response.json({ fact, relevance });
 }

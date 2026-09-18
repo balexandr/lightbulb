@@ -17,12 +17,8 @@ jest.mock('@anthropic-ai/sdk', () => {
   return { __esModule: true, default: MockAnthropic };
 });
 
-const explanation = {
-  summary: 'summary',
-  why: 'why',
-  impact: 'impact',
-  credibility: 'credibility',
-};
+const fact = { summary: 'summary', credibility: 'credibility' };
+const relevance = { why: 'why', impact: 'impact' };
 
 // Each call gets its own IP by default so tests don't share a rate-limit
 // bucket - the limiter is a module-level singleton for the route's lifetime.
@@ -71,19 +67,126 @@ describe('POST /api/illuminate', () => {
     expect(response.status).toBe(400);
   });
 
-  it('returns the parsed explanation on success', async () => {
+  it('returns 400 when neither needFact nor needRelevance is requested', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
-    mockParse.mockResolvedValue({ parsed_output: explanation });
+
+    const response = await POST(
+      makeRequest({ item: { title: 't', source: { name: 'BBC' } }, needFact: false, needRelevance: false })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockParse).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when requesting relevance without fact or a factSummary', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const response = await POST(
+      makeRequest({ item: { title: 't', source: { name: 'BBC' } }, needFact: false, needRelevance: true })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockParse).not.toHaveBeenCalled();
+  });
+
+  it('generates both layers by default and returns them together', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: relevance });
 
     const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' }, domain: 'bbc.com' } }));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(explanation);
+    expect(await response.json()).toEqual({ fact, relevance });
+    expect(mockParse).toHaveBeenCalledTimes(2);
   });
 
-  it('returns 502 when Claude responds with a malformed shape', async () => {
+  it('only generates the fact layer when only fact is requested', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
-    mockParse.mockResolvedValue({ parsed_output: null });
+    mockParse.mockResolvedValueOnce({ parsed_output: fact });
+
+    const response = await POST(
+      makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } }, needFact: true, needRelevance: false })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ fact });
+    expect(mockParse).toHaveBeenCalledTimes(1);
+  });
+
+  it('only generates the relevance layer when a cached factSummary is supplied', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValueOnce({ parsed_output: relevance });
+
+    const response = await POST(
+      makeRequest({
+        item: { title: 'Big news', source: { name: 'BBC' } },
+        needFact: false,
+        needRelevance: true,
+        factSummary: 'a cached summary',
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ relevance });
+    expect(mockParse).toHaveBeenCalledTimes(1);
+    // The relevance prompt should be built from the cached summary, not re-derive facts.
+    const [[callArgs]] = mockParse.mock.calls;
+    expect(callArgs.messages[0].content).toContain('a cached summary');
+  });
+
+  it('passes the bucket into the relevance prompt when set', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: relevance });
+
+    await POST(
+      makeRequest({
+        item: { title: 'Big news', source: { name: 'BBC' } },
+        bucket: { age: '25-34', stance: 'progressive', region: 'unspecified' },
+      })
+    );
+
+    const relevanceCallArgs = mockParse.mock.calls[1][0];
+    expect(relevanceCallArgs.messages[0].content).toContain('25-34');
+    expect(relevanceCallArgs.messages[0].content).toContain('progressive');
+  });
+
+  it('never sends bucket/preference data in the fact-layer prompt', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: relevance });
+
+    await POST(
+      makeRequest({
+        item: { title: 'Big news', source: { name: 'BBC' } },
+        bucket: { age: '25-34', stance: 'progressive', region: 'unspecified' },
+      })
+    );
+
+    const factCallArgs = mockParse.mock.calls[0][0];
+    expect(factCallArgs.messages[0].content).not.toContain('25-34');
+    expect(factCallArgs.messages[0].content).not.toContain('progressive');
+  });
+
+  it('includes the anti-persuasion guardrail in the relevance system prompt', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: relevance });
+
+    await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
+
+    const relevanceCallArgs = mockParse.mock.calls[1][0];
+    expect(relevanceCallArgs.system).toMatch(/never state or imply what opinion/i);
+  });
+
+  it('returns 502 when the fact response is malformed', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValueOnce({ parsed_output: null });
+
+    const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
+    expect(response.status).toBe(502);
+  });
+
+  it('returns 502 when the relevance response is malformed', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: null });
 
     const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
     expect(response.status).toBe(502);
@@ -111,8 +214,8 @@ describe('POST /api/illuminate', () => {
 
   it('rate-limits a single IP after 20 requests within a minute, independent of other IPs', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
-    mockParse.mockResolvedValue({ parsed_output: explanation });
-    const body = { item: { title: 'Big news', source: { name: 'BBC' } } };
+    mockParse.mockResolvedValue({ parsed_output: fact });
+    const body = { item: { title: 'Big news', source: { name: 'BBC' } }, needFact: true, needRelevance: false };
     const hammeredIp = '203.0.113.1';
 
     for (let i = 0; i < 20; i++) {

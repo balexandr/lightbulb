@@ -1,12 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { CACHE_CONFIG } from '@/constants/newsConfig';
-import { AIExplanation, NewsItem } from '@/types/news';
+import { PreferenceBucket } from '@/services/preferencesService';
+import { FactLayer, NewsItem, RelevanceLayer } from '@/types/news';
 import { logger } from '@/utils/logger';
 import { simpleHash } from '@/utils/textUtils';
 
-interface CachedExplanation {
-  explanation: AIExplanation;
+interface CachedFact {
+  fact: FactLayer;
+  timestamp: number;
+  url: string;
+}
+
+interface CachedRelevance {
+  relevance: RelevanceLayer;
   timestamp: number;
   url: string;
 }
@@ -14,6 +21,17 @@ interface CachedExplanation {
 interface CacheIndex {
   keys: string[];
   lastCleanup: number;
+}
+
+export interface CachedExplanationLookup {
+  fact: FactLayer | null;
+  relevance: RelevanceLayer | null;
+}
+
+const MAX_AGE_MS = CACHE_CONFIG.EXPLANATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+
+function bucketCacheSegment(bucket: PreferenceBucket): string {
+  return simpleHash(`${bucket.age}|${bucket.stance}|${bucket.region}`).toString();
 }
 
 export class CacheService {
@@ -47,69 +65,109 @@ export class CacheService {
     }
   }
 
-  private getCacheKey(item: NewsItem): string {
-    const urlHash = simpleHash(item.url);
-    return `${CACHE_CONFIG.EXPLANATION_PREFIX}${urlHash}`;
+  private async addToIndex(key: string): Promise<void> {
+    const index = await this.getIndex();
+    if (!Array.isArray(index.keys)) {
+      index.keys = [];
+    }
+    if (!index.keys.includes(key)) {
+      index.keys.push(key);
+      await this.updateIndex(index);
+    }
   }
 
-  async getExplanation(item: NewsItem): Promise<AIExplanation | null> {
+  private getFactCacheKey(item: NewsItem): string {
+    return `${CACHE_CONFIG.FACT_PREFIX}${simpleHash(item.url)}`;
+  }
+
+  private getRelevanceCacheKey(item: NewsItem, bucket: PreferenceBucket): string {
+    return `${CACHE_CONFIG.RELEVANCE_PREFIX}${simpleHash(item.url)}_${bucketCacheSegment(bucket)}`;
+  }
+
+  async getFact(item: NewsItem): Promise<FactLayer | null> {
     try {
-      const key = this.getCacheKey(item);
+      const key = this.getFactCacheKey(item);
       const cached = await AsyncStorage.getItem(key);
-      
       if (!cached) {
         return null;
       }
 
-      const { explanation, timestamp, url }: CachedExplanation = JSON.parse(cached);
+      const { fact, timestamp, url }: CachedFact = JSON.parse(cached);
 
       // simpleHash is a 32-bit hash, so two different URLs can collide on
       // the same cache key. Without this check a collision would silently
-      // return the wrong article's explanation.
+      // return the wrong article's fact layer.
       if (url !== item.url) {
         return null;
       }
 
-      const age = Date.now() - timestamp;
-      const maxAge = CACHE_CONFIG.EXPLANATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-
-      if (age > maxAge) {
+      if (Date.now() - timestamp > MAX_AGE_MS) {
         await AsyncStorage.removeItem(key);
         return null;
       }
 
-      return explanation;
+      return fact;
     } catch (error) {
-      logger.error('Error reading explanation cache:', error);
+      logger.error('Error reading fact cache:', error);
       return null;
     }
   }
 
-  async setExplanation(item: NewsItem, explanation: AIExplanation): Promise<void> {
+  async setFact(item: NewsItem, fact: FactLayer): Promise<void> {
     try {
-      const key = this.getCacheKey(item);
-      const cached: CachedExplanation = {
-        explanation,
-        timestamp: Date.now(),
-        url: item.url,
-      };
-
+      const key = this.getFactCacheKey(item);
+      const cached: CachedFact = { fact, timestamp: Date.now(), url: item.url };
       await AsyncStorage.setItem(key, JSON.stringify(cached));
-
-      const index = await this.getIndex();
-      // Double-check keys is an array
-      if (!Array.isArray(index.keys)) {
-        index.keys = [];
-      }
-      if (!index.keys.includes(key)) {
-        index.keys.push(key);
-        await this.updateIndex(index);
-      }
-
-      logger.success('Cached explanation');
+      await this.addToIndex(key);
+      logger.success('Cached fact layer');
     } catch (error) {
-      logger.error('Error caching explanation:', error);
+      logger.error('Error caching fact layer:', error);
     }
+  }
+
+  async getRelevance(item: NewsItem, bucket: PreferenceBucket): Promise<RelevanceLayer | null> {
+    try {
+      const key = this.getRelevanceCacheKey(item, bucket);
+      const cached = await AsyncStorage.getItem(key);
+      if (!cached) {
+        return null;
+      }
+
+      const { relevance, timestamp, url }: CachedRelevance = JSON.parse(cached);
+
+      if (url !== item.url) {
+        return null;
+      }
+
+      if (Date.now() - timestamp > MAX_AGE_MS) {
+        await AsyncStorage.removeItem(key);
+        return null;
+      }
+
+      return relevance;
+    } catch (error) {
+      logger.error('Error reading relevance cache:', error);
+      return null;
+    }
+  }
+
+  async setRelevance(item: NewsItem, bucket: PreferenceBucket, relevance: RelevanceLayer): Promise<void> {
+    try {
+      const key = this.getRelevanceCacheKey(item, bucket);
+      const cached: CachedRelevance = { relevance, timestamp: Date.now(), url: item.url };
+      await AsyncStorage.setItem(key, JSON.stringify(cached));
+      await this.addToIndex(key);
+      logger.success('Cached relevance layer');
+    } catch (error) {
+      logger.error('Error caching relevance layer:', error);
+    }
+  }
+
+  // Independent lookups so a caller can request only whichever layer(s)
+  // are actually missing (§15.4), instead of always regenerating both.
+  async getExplanation(item: NewsItem, bucket: PreferenceBucket): Promise<CachedExplanationLookup> {
+    const [fact, relevance] = await Promise.all([this.getFact(item), this.getRelevance(item, bucket)]);
+    return { fact, relevance };
   }
 
   async getCacheStats(): Promise<{ count: number; oldestAge: number | null }> {
@@ -127,7 +185,7 @@ export class CacheService {
         }
       }
 
-      const oldestAge = oldestTimestamp 
+      const oldestAge = oldestTimestamp
         ? Math.floor((Date.now() - oldestTimestamp) / (1000 * 60 * 60 * 24))
         : null;
 
@@ -144,7 +202,6 @@ export class CacheService {
   async clearExpiredCache(): Promise<void> {
     try {
       const index = await this.getIndex();
-      const maxAge = CACHE_CONFIG.EXPLANATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
       const validKeys: string[] = [];
 
       for (const key of index.keys || []) {
@@ -153,7 +210,7 @@ export class CacheService {
           const { timestamp } = JSON.parse(cached);
           const age = Date.now() - timestamp;
 
-          if (age <= maxAge) {
+          if (age <= MAX_AGE_MS) {
             validKeys.push(key);
           } else {
             await AsyncStorage.removeItem(key);
@@ -177,7 +234,7 @@ export class CacheService {
   async clearAllCache(): Promise<void> {
     try {
       const index = await this.getIndex();
-      
+
       for (const key of index.keys || []) {
         await AsyncStorage.removeItem(key);
       }
