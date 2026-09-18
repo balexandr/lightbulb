@@ -2,8 +2,25 @@ import { REDDIT_SUBREDDITS } from '@/constants/newsConfig';
 import { NewsItem } from '@/types/news';
 import { extractDomain } from '@/utils/textUtils';
 
+// Shape of a Reddit "listing" child's `data` object, trimmed to the fields
+// this app actually reads. Reddit's real payload has far more fields.
+export interface RedditPostRaw {
+  id: string;
+  title: string;
+  url: string;
+  score: number;
+  created_utc: number;
+  num_comments: number;
+  stickied: boolean;
+  over_18: boolean;
+  thumbnail?: string;
+  preview?: {
+    images?: { source?: { url?: string } }[];
+  };
+}
+
 export class RedditParser {
-  parsePost(post: any, subreddit: typeof REDDIT_SUBREDDITS[number]): NewsItem {
+  parsePost(post: RedditPostRaw, subreddit: typeof REDDIT_SUBREDDITS[number]): NewsItem {
     return {
       id: post.id,
       title: post.title,
@@ -21,7 +38,7 @@ export class RedditParser {
     };
   }
 
-  private extractImage(post: any): string | undefined {
+  private extractImage(post: RedditPostRaw): string | undefined {
     if (post.preview?.images?.[0]?.source?.url) {
       return post.preview.images[0].source.url.replace(/&amp;/g, '&');
     }
@@ -37,7 +54,7 @@ export class RedditParser {
     return undefined;
   }
 
-  filterValidPosts(posts: any[]): any[] {
+  filterValidPosts(posts: RedditPostRaw[]): RedditPostRaw[] {
     return posts.filter(post => !post.stickied && !post.over_18);
   }
 }
