@@ -21,8 +21,14 @@ const fact = { summary: 'summary', credibility: 'credibility' };
 const relevance = { why: 'why', impact: 'impact' };
 
 // Each call gets its own IP by default so tests don't share a rate-limit
-// bucket - the limiter is a module-level singleton for the route's lifetime.
+// bucket, and each item gets its own title so tests don't share a shared
+// fact/relevance cache entry - both limiter and caches are module-level
+// singletons for the route's lifetime (see app/api/illuminate+api.ts).
 let ipCounter = 0;
+let titleCounter = 0;
+function makeItem(overrides: { domain?: string } = {}) {
+  return { title: `Big news ${++titleCounter}`, source: { name: 'BBC' }, ...overrides };
+}
 function makeRequest(body: unknown, ip: string = `10.0.0.${++ipCounter}`): Request {
   return new Request('http://localhost/api/illuminate', {
     method: 'POST',
@@ -93,7 +99,7 @@ describe('POST /api/illuminate', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
     mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: relevance });
 
-    const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' }, domain: 'bbc.com' } }));
+    const response = await POST(makeRequest({ item: makeItem({ domain: 'bbc.com' }) }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ fact, relevance });
@@ -105,7 +111,7 @@ describe('POST /api/illuminate', () => {
     mockParse.mockResolvedValueOnce({ parsed_output: fact });
 
     const response = await POST(
-      makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } }, needFact: true, needRelevance: false })
+      makeRequest({ item: makeItem(), needFact: true, needRelevance: false })
     );
 
     expect(response.status).toBe(200);
@@ -119,7 +125,7 @@ describe('POST /api/illuminate', () => {
 
     const response = await POST(
       makeRequest({
-        item: { title: 'Big news', source: { name: 'BBC' } },
+        item: makeItem(),
         needFact: false,
         needRelevance: true,
         factSummary: 'a cached summary',
@@ -140,7 +146,7 @@ describe('POST /api/illuminate', () => {
 
     await POST(
       makeRequest({
-        item: { title: 'Big news', source: { name: 'BBC' } },
+        item: makeItem(),
         bucket: { age: '25-34', stance: 'progressive', region: 'unspecified' },
       })
     );
@@ -156,7 +162,7 @@ describe('POST /api/illuminate', () => {
 
     await POST(
       makeRequest({
-        item: { title: 'Big news', source: { name: 'BBC' } },
+        item: makeItem(),
         bucket: { age: '25-34', stance: 'progressive', region: 'unspecified' },
       })
     );
@@ -170,7 +176,7 @@ describe('POST /api/illuminate', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
     mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: relevance });
 
-    await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
+    await POST(makeRequest({ item: makeItem() }));
 
     const relevanceCallArgs = mockParse.mock.calls[1][0];
     expect(relevanceCallArgs.system).toMatch(/never state or imply what opinion/i);
@@ -180,7 +186,7 @@ describe('POST /api/illuminate', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
     mockParse.mockResolvedValueOnce({ parsed_output: null });
 
-    const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
+    const response = await POST(makeRequest({ item: makeItem() }));
     expect(response.status).toBe(502);
   });
 
@@ -188,7 +194,7 @@ describe('POST /api/illuminate', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
     mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: null });
 
-    const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
+    const response = await POST(makeRequest({ item: makeItem() }));
     expect(response.status).toBe(502);
   });
 
@@ -198,7 +204,7 @@ describe('POST /api/illuminate', () => {
       new Anthropic.RateLimitError(429, { message: 'rate limited' }, 'rate limited', new Headers())
     );
 
-    const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
+    const response = await POST(makeRequest({ item: makeItem() }));
     expect(response.status).toBe(429);
   });
 
@@ -208,14 +214,14 @@ describe('POST /api/illuminate', () => {
       new Anthropic.APIError(500, { message: 'boom' }, 'boom', new Headers())
     );
 
-    const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
+    const response = await POST(makeRequest({ item: makeItem() }));
     expect(response.status).toBe(502);
   });
 
   it('rate-limits a single IP after 20 requests within a minute, independent of other IPs', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
     mockParse.mockResolvedValue({ parsed_output: fact });
-    const body = { item: { title: 'Big news', source: { name: 'BBC' } }, needFact: true, needRelevance: false };
+    const body = { item: makeItem(), needFact: true, needRelevance: false };
     const hammeredIp = '203.0.113.1';
 
     for (let i = 0; i < 20; i++) {
@@ -231,5 +237,9 @@ describe('POST /api/illuminate', () => {
     // A different IP is unaffected by the first one's limit.
     const otherIp = await POST(makeRequest(body, '203.0.113.2'));
     expect(otherIp.status).toBe(200);
+
+    // Same article/bucket, 20 identical requests - the shared fact cache
+    // should mean only the very first one actually called Claude.
+    expect(mockParse).toHaveBeenCalledTimes(1);
   });
 });
