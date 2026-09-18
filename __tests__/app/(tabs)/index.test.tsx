@@ -7,7 +7,7 @@ import { cacheService } from '@/services/cacheService';
 import { newsService } from '@/services/newsService';
 import { NewsItem } from '@/types/news';
 
-import HomeScreen from './index';
+import HomeScreen from '@/app/(tabs)/index';
 
 jest.mock('@/services/newsService', () => ({
   newsService: {

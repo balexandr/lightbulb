@@ -62,6 +62,7 @@
     "preset": "jest-expo",
     "testPathIgnorePatterns": [
       "/node_modules/",
+      "/dist/",
       "/app-example/"
     ],
     "setupFiles": [

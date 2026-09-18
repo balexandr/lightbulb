@@ -1,4 +1,4 @@
-import { POST } from './illuminate+api';
+import { POST } from '@/app/api/illuminate+api';
 
 const mockCreate = jest.fn();
 

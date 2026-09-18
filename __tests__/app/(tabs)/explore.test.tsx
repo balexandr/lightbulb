@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 
 import { preferencesService } from '@/services/preferencesService';
 
-import ExploreScreen from './explore';
+import ExploreScreen from '@/app/(tabs)/explore';
 
 jest.mock('@/services/preferencesService', () => ({
   preferencesService: {
