@@ -1,14 +1,9 @@
 import { AIExplanation, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
+import { getApiBaseUrl } from '@/utils/networkUtils';
 
 import { cacheService } from './cacheService';
 import { preferencesService } from './preferencesService';
-
-// On web the /api/illuminate route is same-origin. Native builds have no
-// origin of their own, so they need the deployed server's absolute URL.
-function getApiBaseUrl(): string {
-  return process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-}
 
 class AIService {
   async explainNews(item: NewsItem): Promise<AIExplanation> {

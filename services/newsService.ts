@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-import { CACHE_CONFIG, DEFAULT_FILTER_CONFIG, REDDIT_ENABLED, REDDIT_SUBREDDITS, RSS_FEEDS, RSSFeedConfig, TRUSTED_NEWS_DOMAINS } from '@/constants/newsConfig';
+import { CACHE_CONFIG, DEFAULT_FILTER_CONFIG, REDDIT_SUBREDDITS, RSS_FEEDS, RSSFeedConfig, TRUSTED_NEWS_DOMAINS } from '@/constants/newsConfig';
+import { featureFlagsService } from '@/services/featureFlagsService';
 import { redditParser, RedditPostRaw } from '@/services/parsers/redditParser';
 import { rssParser } from '@/services/parsers/rssParser';
 import { FilterConfig, NewsItem } from '@/types/news';
@@ -146,7 +147,8 @@ export class NewsService {
   }
 
   private async fetchRedditNews(): Promise<NewsItem[]> {
-    if (!REDDIT_ENABLED) {
+    const flags = await featureFlagsService.getFlags();
+    if (!flags.redditEnabled) {
       return [];
     }
 

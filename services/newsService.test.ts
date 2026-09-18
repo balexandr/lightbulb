@@ -1,5 +1,15 @@
-import { deduplicatePosts, filterPosts, sortPosts } from './newsService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+
+import { featureFlagsService } from './featureFlagsService';
+import { deduplicatePosts, filterPosts, NewsService, sortPosts } from './newsService';
 import { NewsItem } from '@/types/news';
+
+jest.mock('axios');
+jest.mock('./featureFlagsService');
+
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+const mockedFlags = featureFlagsService as jest.Mocked<typeof featureFlagsService>;
 
 function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
   return {
@@ -64,6 +74,35 @@ describe('filterPosts', () => {
   it('keeps reddit posts that satisfy every configured rule', () => {
     const post = makeItem({ source: { name: 'r/worldnews', type: 'reddit' }, url: 'https://reuters.com/story', domain: 'reuters.com', score: 50 });
     expect(filterPosts([post], { requireExternalLink: true, requireNewsDomain: true, minScore: 10 })).toEqual([post]);
+  });
+});
+
+describe('NewsService Reddit gating', () => {
+  let newsService: NewsService;
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    jest.clearAllMocks();
+    newsService = new NewsService();
+    mockedAxios.get.mockRejectedValue(new Error('no RSS in this test'));
+  });
+
+  it('does not fetch Reddit when the feature flag is off', async () => {
+    mockedFlags.getFlags.mockResolvedValue({ redditEnabled: false });
+
+    await newsService.fetchAllNews();
+
+    const calledUrls = mockedAxios.get.mock.calls.map(([url]) => String(url));
+    expect(calledUrls.some(url => url.includes('reddit.com'))).toBe(false);
+  });
+
+  it('fetches Reddit when the feature flag is on', async () => {
+    mockedFlags.getFlags.mockResolvedValue({ redditEnabled: true });
+
+    await newsService.fetchAllNews();
+
+    const calledUrls = mockedAxios.get.mock.calls.map(([url]) => String(url));
+    expect(calledUrls.some(url => url.includes('reddit.com'))).toBe(true);
   });
 });
 

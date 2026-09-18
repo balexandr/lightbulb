@@ -74,12 +74,11 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
   },
 ];
 
-// Reddit is off by default (unauthenticated JSON-endpoint scraping is
-// against Reddit's User Agreement — see docs/TECHNICAL_GUIDE.md §12.1).
-// Kept in the codebase, not deleted, in case Reddit gets re-added later
-// under proper OAuth. Flip to true for local testing only.
-export const REDDIT_ENABLED = false;
-
+// Whether Reddit fetching is enabled is a server-driven feature flag now
+// (see types/featureFlags.ts, app/api/flags+api.ts) rather than a hardcoded
+// constant here - unauthenticated JSON-endpoint scraping is against
+// Reddit's User Agreement (docs/TECHNICAL_GUIDE.md §12.1), so it defaults
+// off, but can be flipped via a Render env var without a client rebuild.
 export const REDDIT_SUBREDDITS = [
   'worldnews',
   'technology',
@@ -116,6 +115,8 @@ export const CACHE_CONFIG = {
   INDEX_KEY: '@lightbulb_cache_index',
   NEWS_DURATION: 5 * 60 * 1000, // 5 minutes
   EXPLANATION_EXPIRY_DAYS: 7,
+  FLAGS_KEY: '@lightbulb_feature_flags',
+  FLAGS_DURATION: 15 * 60 * 1000, // 15 minutes
 } as const;
 
 export const DEFAULT_FILTER_CONFIG = {

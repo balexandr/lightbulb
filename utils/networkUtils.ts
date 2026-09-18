@@ -13,7 +13,7 @@ export function getCorsProxyUrl(url: string): string {
 
 export function getRequestHeaders(isRSS: boolean = false): Record<string, string> {
   const headers: Record<string, string> = {
-    'Accept': isRSS 
+    'Accept': isRSS
       ? 'application/rss+xml, application/xml, text/xml, */*'
       : 'application/json',
   };
@@ -23,4 +23,11 @@ export function getRequestHeaders(isRSS: boolean = false): Record<string, string
   }
 
   return headers;
+}
+
+// On web, our own API routes (/api/illuminate, /api/flags) are same-origin.
+// Native builds have no origin of their own, so they need the deployed
+// server's absolute URL.
+export function getApiBaseUrl(): string {
+  return process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 }
