@@ -25,6 +25,27 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Deploying the web server (Render)
+
+`app.json`'s `web.output` is `"server"` because `app/api/illuminate+api.ts`
+is a real API route (proxies OpenAI so the key never reaches the client) —
+that only works when the web build runs as a Node server, not static files.
+
+This repo includes a `render.yaml` blueprint:
+
+1. On Render, "New" → "Blueprint", point it at this repo.
+2. Set `OPENAI_API_KEY` in the service's environment settings (marked
+   `sync: false` in the blueprint, so Render prompts for it rather than
+   storing it in git).
+3. Deploy. `npm run build` (`expo export -p web`) produces `dist/client`
+   (static assets) and `dist/server` (the API route); `npm run serve`
+   (`node server.js`) serves both.
+
+Native (iOS/Android) builds have no same-origin `/api/illuminate` to call,
+so set `EXPO_PUBLIC_API_BASE_URL` to the deployed Render URL when building
+those — see `.env.example`. Don't set it for the web build itself; leaving
+it unset makes the web client call `/api/illuminate` same-origin.
+
 ## Get a fresh project
 
 When you're ready, run:

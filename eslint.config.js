@@ -7,4 +7,10 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    files: ['server.js'],
+    languageOptions: {
+      globals: { __dirname: 'readonly', module: 'writable', require: 'readonly', process: 'readonly' },
+    },
+  },
 ]);
