@@ -74,6 +74,12 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
   },
 ];
 
+// Reddit is off by default (unauthenticated JSON-endpoint scraping is
+// against Reddit's User Agreement — see docs/TECHNICAL_GUIDE.md §12.1).
+// Kept in the codebase, not deleted, in case Reddit gets re-added later
+// under proper OAuth. Flip to true for local testing only.
+export const REDDIT_ENABLED = false;
+
 export const REDDIT_SUBREDDITS = [
   'worldnews',
   'technology',
