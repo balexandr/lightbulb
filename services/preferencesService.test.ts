@@ -41,3 +41,33 @@ describe('PreferencesService', () => {
     expect(await preferencesService.getPreferences()).toEqual({});
   });
 });
+
+describe('getPreferenceBucket', () => {
+  it('buckets unset preferences as unspecified across the board', () => {
+    expect(preferencesService.getPreferenceBucket({})).toEqual({
+      age: 'unspecified',
+      stance: 'unspecified',
+      region: 'unspecified',
+    });
+  });
+
+  it('passes through age and stance as-is, since they are already small fixed enums', () => {
+    expect(
+      preferencesService.getPreferenceBucket({ ageRange: '25-34', politicalStandpoint: 'progressive' })
+    ).toEqual({
+      age: '25-34',
+      stance: 'progressive',
+      region: 'unspecified',
+    });
+  });
+
+  it('ignores gender and location - not part of the bucket yet', () => {
+    expect(
+      preferencesService.getPreferenceBucket({ gender: 'nonbinary', location: 'Philadelphia, PA' })
+    ).toEqual({
+      age: 'unspecified',
+      stance: 'unspecified',
+      region: 'unspecified',
+    });
+  });
+});

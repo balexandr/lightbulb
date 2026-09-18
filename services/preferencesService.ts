@@ -11,6 +11,21 @@ export interface UserPreferences {
   location?: string;
 }
 
+// A small fixed set unrelated users share cache entries across (see
+// docs/TECHNICAL_GUIDE.md §14.3) - never the raw preference values.
+export type AgeBucket = AgeRange | 'unspecified';
+export type StanceBucket = NonNullable<UserPreferences['politicalStandpoint']> | 'unspecified';
+// Reserved for when location collection ships (explore.tsx currently lists
+// it under "Coming Soon") - always 'unspecified' until then. Once it does,
+// bucket it to state/region level, never city/zip (§12.4).
+export type RegionBucket = 'unspecified';
+
+export interface PreferenceBucket {
+  age: AgeBucket;
+  stance: StanceBucket;
+  region: RegionBucket;
+}
+
 const PREFERENCES_KEY = '@lightbulb_user_preferences';
 
 class PreferencesService {
@@ -52,6 +67,17 @@ class PreferencesService {
     } catch (error) {
       logger.error('Error clearing preferences:', error);
     }
+  }
+
+  // Reduces raw stored preferences to the fixed bucket set used for cache
+  // keys and the Illuminate API request - the UI still shows/edits the raw
+  // values (§15.2), bucketing only happens at the point of use.
+  getPreferenceBucket(preferences: UserPreferences): PreferenceBucket {
+    return {
+      age: preferences.ageRange ?? 'unspecified',
+      stance: preferences.politicalStandpoint ?? 'unspecified',
+      region: 'unspecified',
+    };
   }
 }
 
