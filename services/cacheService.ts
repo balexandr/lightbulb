@@ -61,7 +61,15 @@ export class CacheService {
         return null;
       }
 
-      const { explanation, timestamp }: CachedExplanation = JSON.parse(cached);
+      const { explanation, timestamp, url }: CachedExplanation = JSON.parse(cached);
+
+      // simpleHash is a 32-bit hash, so two different URLs can collide on
+      // the same cache key. Without this check a collision would silently
+      // return the wrong article's explanation.
+      if (url !== item.url) {
+        return null;
+      }
+
       const age = Date.now() - timestamp;
       const maxAge = CACHE_CONFIG.EXPLANATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
