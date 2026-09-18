@@ -30,6 +30,48 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://techcrunch.com/wp-content/uploads/2015/02/cropped-cropped-favicon-gradient.png',
     fallbackImage: 'https://techcrunch.com/wp-content/uploads/2015/02/cropped-cropped-favicon-gradient.png'
   },
+  {
+    name: 'The Guardian',
+    url: 'https://www.theguardian.com/world/rss',
+    icon: 'https://www.theguardian.com/favicon.ico',
+    fallbackImage: 'https://assets.guim.co.uk/images/guardian-logo-rss.c45beb1bafa34b347ac333af2e6fe23f.png'
+  },
+  {
+    name: 'Al Jazeera',
+    url: 'https://www.aljazeera.com/xml/rss/all.xml',
+    icon: 'https://www.aljazeera.com/favicon.ico',
+    fallbackImage: 'https://www.aljazeera.com/images/logo_aje.png'
+  },
+  {
+    name: 'CBC',
+    url: 'https://www.cbc.ca/cmlink/rss-topstories',
+    icon: 'https://www.cbc.ca/favicon.ico',
+    fallbackImage: 'https://www.cbc.ca/favicon.ico'
+  },
+  {
+    name: 'NYTimes',
+    url: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',
+    icon: 'https://www.nytimes.com/favicon.ico',
+    fallbackImage: 'https://static01.nyt.com/images/icons/t_logo_291_black.png'
+  },
+  {
+    name: 'Wired',
+    url: 'https://www.wired.com/feed/rss',
+    icon: 'https://www.wired.com/favicon.ico',
+    fallbackImage: 'https://www.wired.com/verso/static/wired/assets/favicon.ico'
+  },
+  {
+    name: 'Engadget',
+    url: 'https://www.engadget.com/rss.xml',
+    icon: 'https://www.engadget.com/apple-touch-icon.png',
+    fallbackImage: 'https://www.engadget.com/apple-touch-icon.png'
+  },
+  {
+    name: 'Hacker News',
+    url: 'https://hnrss.org/frontpage',
+    icon: 'https://news.ycombinator.com/favicon.ico',
+    fallbackImage: 'https://news.ycombinator.com/y18.svg'
+  },
 ];
 
 export const REDDIT_SUBREDDITS = [
@@ -40,6 +82,7 @@ export const REDDIT_SUBREDDITS = [
   'geopolitics',
   'space',
   'europe',
+  'Economics',
 ] as const;
 
 export const TRUSTED_NEWS_DOMAINS = [
@@ -55,7 +98,10 @@ export const TRUSTED_NEWS_DOMAINS = [
   'news.ycombinator.com',
   'cbc.ca',
   'huffpost.com',
-  'aljazeera.com'
+  'aljazeera.com',
+  'theguardian.com',
+  'wired.com',
+  'engadget.com'
 ] as const;
 
 export const CACHE_CONFIG = {
