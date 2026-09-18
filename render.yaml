@@ -12,3 +12,9 @@ services:
         value: 22.23.1
       - key: FEATURE_REDDIT_ENABLED
         value: "false"
+      # Optional - see .env.example. Without these the illuminate route
+      # falls back to an in-memory cache that resets on every restart.
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false

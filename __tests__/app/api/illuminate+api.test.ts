@@ -17,6 +17,11 @@ jest.mock('@anthropic-ai/sdk', () => {
   return { __esModule: true, default: MockAnthropic };
 });
 
+// Never load the real client - UPSTASH_REDIS_REST_URL/TOKEN aren't set in
+// tests, so createSharedCache always falls back to the in-memory cache
+// anyway; this just keeps the real (ESM) package out of the test run.
+jest.mock('@upstash/redis', () => ({ Redis: jest.fn() }));
+
 const fact = { summary: 'summary', credibility: 'credibility' };
 const relevance = { why: 'why', impact: 'impact' };
 

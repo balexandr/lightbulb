@@ -4,8 +4,8 @@ import { z } from 'zod';
 
 import { PreferenceBucket } from '@/services/preferencesService';
 import { FactLayer, RelevanceLayer } from '@/types/news';
-import { MemoryCache } from '@/utils/memoryCache';
 import { RateLimiter } from '@/utils/rateLimiter';
+import { createSharedCache } from '@/utils/sharedCache';
 
 const CLAUDE_MODEL = 'claude-haiku-4-5';
 const MAX_TOKENS = 1024;
@@ -17,13 +17,15 @@ const RATE_LIMIT_MAX_REQUESTS = 20;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const rateLimiter = new RateLimiter(RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
 
-// Shared across every request this server instance handles (not per-device
-// like cacheService.ts) - the first user anywhere to Illuminate a given
-// article/bucket pays for it, everyone else on this instance gets a cache
-// hit instead of a Claude call. See utils/memoryCache.ts for the tradeoff.
+// Shared across every request this server handles (not per-device like
+// cacheService.ts) - the first user anywhere to Illuminate a given
+// article/bucket pays for it, everyone else gets a cache hit instead of a
+// Claude call. Backed by Upstash Redis when UPSTASH_REDIS_REST_URL/TOKEN
+// are set (persists across restarts), else an in-memory fallback that
+// doesn't (see utils/sharedCache.ts).
 const SHARED_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const factCache = new MemoryCache<FactLayer>(SHARED_CACHE_TTL_MS, 500);
-const relevanceCache = new MemoryCache<RelevanceLayer>(SHARED_CACHE_TTL_MS, 2000);
+const factCache = createSharedCache<FactLayer>('fact:', SHARED_CACHE_TTL_MS, 500);
+const relevanceCache = createSharedCache<RelevanceLayer>('relevance:', SHARED_CACHE_TTL_MS, 2000);
 
 function articleCacheKey(item: IlluminateRequestItem): string {
   // The client never sends the article URL (see aiService.ts), only these
@@ -107,7 +109,7 @@ function anthropicErrorResponse(error: unknown): Response {
 
 async function generateFact(anthropic: Anthropic, item: IlluminateRequestItem): Promise<FactLayer | Response> {
   const cacheKey = articleCacheKey(item);
-  const cached = factCache.get(cacheKey);
+  const cached = await factCache.get(cacheKey);
   if (cached) {
     return cached;
   }
@@ -133,7 +135,7 @@ Provide:
     if (!response.parsed_output) {
       return Response.json({ error: 'Claude fact response did not match expected shape.' }, { status: 502 });
     }
-    factCache.set(cacheKey, response.parsed_output);
+    await factCache.set(cacheKey, response.parsed_output);
     return response.parsed_output;
   } catch (error) {
     return anthropicErrorResponse(error);
@@ -147,7 +149,7 @@ async function generateRelevance(
   bucket: PreferenceBucket
 ): Promise<RelevanceLayer | Response> {
   const cacheKey = relevanceCacheKey(item, bucket);
-  const cached = relevanceCache.get(cacheKey);
+  const cached = await relevanceCache.get(cacheKey);
   if (cached) {
     return cached;
   }
@@ -180,7 +182,7 @@ Explain why this story is relevant to this reader and its potential impact, foll
     if (!response.parsed_output) {
       return Response.json({ error: 'Claude relevance response did not match expected shape.' }, { status: 502 });
     }
-    relevanceCache.set(cacheKey, response.parsed_output);
+    await relevanceCache.set(cacheKey, response.parsed_output);
     return response.parsed_output;
   } catch (error) {
     return anthropicErrorResponse(error);
