@@ -3,9 +3,25 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 
 import { UserPreferences } from '@/services/preferencesService';
+import { RateLimiter } from '@/utils/rateLimiter';
 
 const CLAUDE_MODEL = 'claude-haiku-4-5';
 const MAX_TOKENS = 1024;
+
+// This route spends real money per call and has no auth - rate-limit by IP
+// so a single client can't run up the Anthropic bill. Fixed per-instance;
+// see utils/rateLimiter.ts for the tradeoff if this ever runs multi-instance.
+const RATE_LIMIT_MAX_REQUESTS = 20;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const rateLimiter = new RateLimiter(RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
+
+function getClientIp(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return 'unknown';
+}
 
 const AIExplanationSchema = z.object({
   summary: z.string(),
@@ -53,6 +69,14 @@ function buildUserContext(preferences: UserPreferences): string {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const rateLimit = rateLimiter.check(getClientIp(request));
+  if (rateLimit.limited) {
+    return Response.json(
+      { error: 'Too many requests. Please try again shortly.' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+    );
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return Response.json({ error: 'AI explanations are not configured on this server.' }, { status: 503 });

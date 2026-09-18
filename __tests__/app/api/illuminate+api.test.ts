@@ -24,10 +24,14 @@ const explanation = {
   credibility: 'credibility',
 };
 
-function makeRequest(body: unknown): Request {
+// Each call gets its own IP by default so tests don't share a rate-limit
+// bucket - the limiter is a module-level singleton for the route's lifetime.
+let ipCounter = 0;
+function makeRequest(body: unknown, ip: string = `10.0.0.${++ipCounter}`): Request {
   return new Request('http://localhost/api/illuminate', {
     method: 'POST',
     body: JSON.stringify(body),
+    headers: { 'x-forwarded-for': ip },
   });
 }
 
@@ -50,7 +54,11 @@ describe('POST /api/illuminate', () => {
 
   it('returns 400 for invalid JSON', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
-    const request = new Request('http://localhost/api/illuminate', { method: 'POST', body: 'not-json' });
+    const request = new Request('http://localhost/api/illuminate', {
+      method: 'POST',
+      body: 'not-json',
+      headers: { 'x-forwarded-for': `10.0.0.${++ipCounter}` },
+    });
 
     const response = await POST(request);
     expect(response.status).toBe(400);
@@ -99,5 +107,26 @@ describe('POST /api/illuminate', () => {
 
     const response = await POST(makeRequest({ item: { title: 'Big news', source: { name: 'BBC' } } }));
     expect(response.status).toBe(502);
+  });
+
+  it('rate-limits a single IP after 20 requests within a minute, independent of other IPs', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValue({ parsed_output: explanation });
+    const body = { item: { title: 'Big news', source: { name: 'BBC' } } };
+    const hammeredIp = '203.0.113.1';
+
+    for (let i = 0; i < 20; i++) {
+      const response = await POST(makeRequest(body, hammeredIp));
+      expect(response.status).toBe(200);
+    }
+
+    const blocked = await POST(makeRequest(body, hammeredIp));
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('Retry-After')).toBeTruthy();
+    expect(await blocked.json()).toEqual({ error: 'Too many requests. Please try again shortly.' });
+
+    // A different IP is unaffected by the first one's limit.
+    const otherIp = await POST(makeRequest(body, '203.0.113.2'));
+    expect(otherIp.status).toBe(200);
   });
 });
