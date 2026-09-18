@@ -23,9 +23,21 @@ export interface FilterConfig {
   minScore?: number;
 }
 
-export interface AIExplanation {
+// Preference-independent: what happened, how reliable the source is. Same
+// for every reader - cached per-article only (see cacheService).
+export interface FactLayer {
   summary: string;
-  why: string;
-  impact: string;
   credibility: string;
 }
+
+// Preference-dependent: why this matters to *this* reader, given their
+// bucketed context - cached per-article-per-bucket (see cacheService).
+export interface RelevanceLayer {
+  why: string;
+  impact: string;
+}
+
+// What the modal actually renders - assembled client-side from the two
+// layers above (see aiService.explainNews). Same flat shape as before the
+// fact/relevance split, so IlluminateModal didn't need to change.
+export interface AIExplanation extends FactLayer, RelevanceLayer {}
