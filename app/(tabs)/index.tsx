@@ -11,7 +11,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { aiService } from '@/services/aiService';
 import { cacheService } from '@/services/cacheService';
 import { newsService } from '@/services/newsService';
-import { preferencesService } from '@/services/preferencesService';
+import { PreferenceBucket, preferencesService } from '@/services/preferencesService';
 import { AIExplanation, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
 
@@ -25,6 +25,7 @@ export default function HomeScreen() {
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
   const [illuminateLoading, setIlluminateLoading] = useState(false);
   const [explanation, setExplanation] = useState<AIExplanation | null>(null);
+  const [explanationBucket, setExplanationBucket] = useState<PreferenceBucket | null>(null);
   const [fromCache, setFromCache] = useState(false);
   
   const [rssSources, setRssSources] = useState<string[]>([]);
@@ -113,6 +114,7 @@ export default function HomeScreen() {
     try {
       const preferences = await preferencesService.getPreferences();
       const bucket = preferencesService.getPreferenceBucket(preferences);
+      setExplanationBucket(bucket);
       const cached = await cacheService.getExplanation(item, bucket);
       if (cached.fact && cached.relevance) {
         setFromCache(true);
@@ -131,6 +133,7 @@ export default function HomeScreen() {
     setModalVisible(false);
     setSelectedItem(null);
     setExplanation(null);
+    setExplanationBucket(null);
     setFromCache(false);
   };
 
@@ -265,6 +268,7 @@ export default function HomeScreen() {
         loading={illuminateLoading}
         fromCache={fromCache}
         explanation={explanation ?? undefined}
+        bucket={explanationBucket ?? undefined}
       />
 
       <FilterMenu

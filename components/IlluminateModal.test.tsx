@@ -47,4 +47,42 @@ describe('IlluminateModal', () => {
     fireEvent.press(screen.getByText('✕'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  describe('"show your work" transparency section', () => {
+    it('names the bucket values that shaped the relevance layer', () => {
+      render(
+        <IlluminateModal
+          visible
+          title="A headline"
+          explanation={explanation}
+          bucket={{ age: '25-34', stance: 'progressive', region: 'unspecified' }}
+          onClose={jest.fn()}
+        />
+      );
+
+      expect(screen.getByText('Shown because: age 25-34, progressive-leaning.')).toBeTruthy();
+    });
+
+    it('explains a fully unspecified bucket as a general explanation', () => {
+      render(
+        <IlluminateModal
+          visible
+          title="A headline"
+          explanation={explanation}
+          bucket={{ age: 'unspecified', stance: 'unspecified', region: 'unspecified' }}
+          onClose={jest.fn()}
+        />
+      );
+
+      expect(
+        screen.getByText('Shown because: no preferences are set, so this is a general, audience-agnostic explanation.')
+      ).toBeTruthy();
+    });
+
+    it('always shows the data-sent disclosure, regardless of bucket', () => {
+      render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} />);
+
+      expect(screen.getByText(/We send Claude this headline/)).toBeTruthy();
+    });
+  });
 });

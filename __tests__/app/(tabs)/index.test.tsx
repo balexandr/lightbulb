@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Linking, RefreshControl } from 'react-native';
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
@@ -5,6 +6,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { aiService } from '@/services/aiService';
 import { cacheService } from '@/services/cacheService';
 import { newsService } from '@/services/newsService';
+import { preferencesService } from '@/services/preferencesService';
 import { NewsItem } from '@/types/news';
 
 import HomeScreen from '@/app/(tabs)/index';
@@ -51,8 +53,9 @@ describe('HomeScreen', () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined as any);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     jest.clearAllMocks();
+    await AsyncStorage.clear();
   });
 
   it('shows a loading indicator, then the fetched articles', async () => {
@@ -98,6 +101,24 @@ describe('HomeScreen', () => {
 
     await waitFor(() => expect(screen.getByText('The summary.')).toBeTruthy());
     expect(mockAiService.explainNews).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-1' }));
+  });
+
+  it('shows which preference bucket shaped the explanation in "show your work"', async () => {
+    await preferencesService.savePreferences({ ageRange: '25-34', politicalStandpoint: 'progressive' });
+    mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
+    mockAiService.explainNews.mockResolvedValue({
+      summary: 'The summary.',
+      why: 'The why.',
+      impact: 'The impact.',
+      credibility: 'The credibility.',
+    });
+
+    render(<HomeScreen />);
+    await waitFor(() => screen.getByText('A big headline'));
+
+    fireEvent.press(screen.getByText('💡 Illuminate'));
+
+    await waitFor(() => expect(screen.getByText('Shown because: age 25-34, progressive-leaning.')).toBeTruthy());
   });
 
   it('filters out a source once it is unchecked in the filter menu', async () => {

@@ -1,5 +1,6 @@
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { PreferenceBucket } from '@/services/preferencesService';
 import { AIExplanation } from '@/types/news';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
@@ -12,9 +13,27 @@ interface IlluminateModalProps {
   loading?: boolean;
   fromCache?: boolean;
   explanation?: AIExplanation;
+  bucket?: PreferenceBucket;
 }
 
-export function IlluminateModal({ visible, onClose, title, loading, fromCache, explanation }: IlluminateModalProps) {
+// §17.6 "show your work" - names which bucket values actually shaped the
+// "Why Is This Happening?"/"How Does This Affect You?" sections, sourced
+// directly from the same PreferenceBucket used as the cache key (§15.3).
+// If this ever reads like it's nudging an opinion rather than naming
+// inputs, that's a signal the underlying prompt has drifted (§14.6).
+function describeBucket(bucket: PreferenceBucket): string {
+  const parts: string[] = [];
+  if (bucket.age !== 'unspecified') parts.push(`age ${bucket.age}`);
+  if (bucket.stance !== 'unspecified') parts.push(`${bucket.stance}-leaning`);
+  if (bucket.region !== 'unspecified') parts.push(bucket.region);
+
+  if (parts.length === 0) {
+    return 'Shown because: no preferences are set, so this is a general, audience-agnostic explanation.';
+  }
+  return `Shown because: ${parts.join(', ')}.`;
+}
+
+export function IlluminateModal({ visible, onClose, title, loading, fromCache, explanation, bucket }: IlluminateModalProps) {
   const colorScheme = useColorScheme() ?? 'light';
 
   return (
@@ -76,6 +95,17 @@ export function IlluminateModal({ visible, onClose, title, loading, fromCache, e
                   <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>✓ Source Credibility</ThemedText>
                 </View>
                 <ThemedText style={styles.sectionContent}>{explanation.credibility}</ThemedText>
+              </View>
+
+              <View style={styles.transparencyBox}>
+                <ThemedText style={styles.transparencyTitle}>🔍 Show your work</ThemedText>
+                {bucket && (
+                  <ThemedText style={styles.transparencyText}>{describeBucket(bucket)}</ThemedText>
+                )}
+                <ThemedText style={styles.transparencyText}>
+                  We send Claude this headline, its source, and — only if you&apos;ve set them — your general age
+                  range and political leaning. Never your exact age, name, or location.
+                </ThemedText>
               </View>
             </>
           ) : (
@@ -146,6 +176,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 24,
     opacity: 0.85,
+  },
+  transparencyBox: {
+    marginBottom: 24,
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: 'rgba(128, 128, 128, 0.08)',
+    gap: 6,
+  },
+  transparencyTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    opacity: 0.7,
+  },
+  transparencyText: {
+    fontSize: 12,
+    lineHeight: 18,
+    opacity: 0.6,
   },
   loadingContainer: {
     paddingVertical: 60,
