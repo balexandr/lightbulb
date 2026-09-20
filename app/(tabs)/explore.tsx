@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -193,6 +194,18 @@ export default function ExploreScreen() {
             {'\n'}• Personalized news sources
           </ThemedText>
         </ThemedView>
+
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Legal
+          </ThemedText>
+          <Link href="/privacy" style={styles.legalLink}>
+            <ThemedText style={styles.legalLinkText}>Privacy Policy</ThemedText>
+          </Link>
+          <Link href="/terms" style={styles.legalLink}>
+            <ThemedText style={styles.legalLinkText}>Terms of Service</ThemedText>
+          </Link>
+        </ThemedView>
       </ScrollView>
     </ThemedView>
   );
@@ -280,5 +293,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.5,
     lineHeight: 24,
+  },
+  legalLink: {
+    paddingVertical: 12,
+  },
+  legalLinkText: {
+    fontSize: 15,
+    textDecorationLine: 'underline',
   },
 });

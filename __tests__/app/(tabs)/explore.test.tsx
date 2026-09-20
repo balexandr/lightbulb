@@ -71,4 +71,12 @@ describe('ExploreScreen', () => {
       )
     );
   });
+
+  it('links to the Privacy Policy and Terms of Service', async () => {
+    render(<ExploreScreen />);
+    await waitFor(() => expect(mockPreferencesService.getPreferences).toHaveBeenCalled());
+
+    expect(screen.getByText('Privacy Policy')).toBeTruthy();
+    expect(screen.getByText('Terms of Service')).toBeTruthy();
+  });
 });
