@@ -139,6 +139,39 @@ describe('HomeScreen', () => {
     expect(screen.getByText('BBC story')).toBeTruthy();
   });
 
+  it('shows a coverage comparison pill only for articles with a clustered match, and opens the comparison modal', async () => {
+    mockNewsService.fetchAllNews.mockResolvedValue([
+      makeItem({
+        id: 'bbc-item',
+        title: 'Senate passes sweeping climate legislation',
+        source: { name: 'BBC', type: 'rss' },
+      }),
+      makeItem({
+        id: 'npr-item',
+        title: 'Senate passes sweeping climate legislation bill',
+        source: { name: 'NPR', type: 'rss' },
+        url: 'https://example.com/npr',
+      }),
+      makeItem({
+        id: 'unrelated-item',
+        title: 'Local bakery wins national award',
+        source: { name: 'CBC', type: 'rss' },
+        url: 'https://example.com/bakery',
+      }),
+    ]);
+
+    render(<HomeScreen />);
+    await waitFor(() => screen.getByText('Senate passes sweeping climate legislation'));
+
+    expect(screen.getAllByText(/See how 1 other outlet covered this/)).toHaveLength(2);
+
+    fireEvent.press(screen.getAllByText(/See how 1 other outlet covered this/)[0]);
+
+    await waitFor(() => expect(screen.getByText('🔀 Coverage Comparison')).toBeTruthy());
+    // Appears once in the feed card behind the modal, once inside the modal.
+    expect(screen.getAllByText('Senate passes sweeping climate legislation bill')).toHaveLength(2);
+  });
+
   it('force-refreshes and clears the cache on pull-to-refresh', async () => {
     mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
     render(<HomeScreen />);

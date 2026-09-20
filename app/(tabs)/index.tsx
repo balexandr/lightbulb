@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { CoverageComparisonModal } from '@/components/CoverageComparisonModal';
 import { FilterMenu } from '@/components/FilterMenu';
 import { IlluminateModal } from '@/components/IlluminateModal';
 import { ThemedText } from '@/components/themed-text';
@@ -14,6 +15,7 @@ import { newsService } from '@/services/newsService';
 import { PreferenceBucket, preferencesService } from '@/services/preferencesService';
 import { AIExplanation, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
+import { buildRelatedArticlesIndex } from '@/utils/storyClustering';
 
 export default function HomeScreen() {
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -31,8 +33,16 @@ export default function HomeScreen() {
   const [rssSources, setRssSources] = useState<string[]>([]);
   const [redditSources, setRedditSources] = useState<string[]>([]);
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
-  
+
+  const [comparisonItem, setComparisonItem] = useState<NewsItem | null>(null);
+  const [comparisonVisible, setComparisonVisible] = useState(false);
+
   const colorScheme = useColorScheme() ?? 'light';
+
+  // Clustered over the full fetched list, not the source-filtered one - a
+  // user who's hidden a source in the filter menu should still be able to
+  // discover that it covered a story they're reading elsewhere.
+  const relatedArticlesIndex = useMemo(() => buildRelatedArticlesIndex(news), [news]);
 
   const loadNews = async (forceRefresh = false) => {
     try {
@@ -102,6 +112,31 @@ export default function HomeScreen() {
     } catch (error) {
       logger.error('Error opening URL:', error);
     }
+  };
+
+  const handleShowComparison = (item: NewsItem) => {
+    setComparisonItem(item);
+    setComparisonVisible(true);
+  };
+
+  const handleCloseComparison = () => {
+    setComparisonVisible(false);
+    setComparisonItem(null);
+  };
+
+  const renderComparisonPill = (item: NewsItem) => {
+    const related = relatedArticlesIndex.get(item.id);
+    if (!related || related.length === 0) {
+      return null;
+    }
+
+    return (
+      <TouchableOpacity style={styles.comparisonRow} onPress={() => handleShowComparison(item)}>
+        <Text style={styles.comparisonText}>
+          🔀 See how {related.length} other {related.length === 1 ? 'outlet' : 'outlets'} covered this
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   const handleIlluminate = async (item: NewsItem) => {
@@ -241,13 +276,14 @@ export default function HomeScreen() {
                   <ThemedText style={styles.domain}> • {item.domain}</ThemedText>
                 )}
               </View>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.illuminateButton}
                 onPress={() => handleIlluminate(item)}
               >
                 <Text style={styles.illuminateText}>💡 Illuminate</Text>
               </TouchableOpacity>
             </ThemedView>
+            {renderComparisonPill(item)}
           </ThemedView>
         )}
         contentContainerStyle={styles.listContent}
@@ -280,6 +316,14 @@ export default function HomeScreen() {
         onToggleSource={handleToggleSource}
         onSelectAll={handleSelectAll}
         onClearAll={handleClearAll}
+      />
+
+      <CoverageComparisonModal
+        visible={comparisonVisible}
+        onClose={handleCloseComparison}
+        mainItem={comparisonItem}
+        relatedItems={comparisonItem ? relatedArticlesIndex.get(comparisonItem.id) ?? [] : []}
+        onOpenArticle={handleOpenArticle}
       />
     </ThemedView>
   );
@@ -407,6 +451,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: AccentColor,
+  },
+  comparisonRow: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  comparisonText: {
+    fontSize: 12,
+    opacity: 0.7,
   },
   listContent: {
     paddingBottom: 20,
