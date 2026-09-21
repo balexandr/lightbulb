@@ -8,6 +8,7 @@ import * as Speech from 'expo-speech';
 import { aiService } from '@/services/aiService';
 import { briefingService } from '@/services/briefingService';
 import { cacheService } from '@/services/cacheService';
+import { engagementService } from '@/services/engagementService';
 import { newsService } from '@/services/newsService';
 import { preferencesService } from '@/services/preferencesService';
 import { NewsItem } from '@/types/news';
@@ -39,6 +40,13 @@ jest.mock('@/services/briefingService', () => ({
   },
 }));
 
+jest.mock('@/services/engagementService', () => ({
+  engagementService: {
+    getEngagementScores: jest.fn(),
+    recordIlluminateSession: jest.fn(),
+  },
+}));
+
 jest.mock('expo-speech', () => ({
   speak: jest.fn(),
   stop: jest.fn(),
@@ -48,6 +56,7 @@ const mockNewsService = newsService as jest.Mocked<typeof newsService>;
 const mockAiService = aiService as jest.Mocked<typeof aiService>;
 const mockCacheService = cacheService as jest.Mocked<typeof cacheService>;
 const mockBriefingService = briefingService as jest.Mocked<typeof briefingService>;
+const mockEngagementService = engagementService as jest.Mocked<typeof engagementService>;
 const mockSpeech = Speech as jest.Mocked<typeof Speech>;
 
 function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
@@ -65,6 +74,8 @@ describe('HomeScreen', () => {
   beforeEach(() => {
     mockNewsService.clearCache.mockResolvedValue();
     mockCacheService.getExplanation.mockResolvedValue({ fact: null, relevance: null });
+    mockEngagementService.getEngagementScores.mockResolvedValue({});
+    mockEngagementService.recordIlluminateSession.mockResolvedValue();
     jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined as any);
   });
@@ -135,6 +146,78 @@ describe('HomeScreen', () => {
     fireEvent.press(screen.getByText('💡 Illuminate'));
 
     await waitFor(() => expect(screen.getByText('Shown because: age 25-34, progressive-leaning.')).toBeTruthy());
+  });
+
+  describe('engagement tracking and ranking (§18.2)', () => {
+    it('records a full read when the explanation stays open past the threshold', async () => {
+      const realNow = Date.now;
+      mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
+      mockAiService.explainNews.mockResolvedValue({
+        summary: 'The summary.',
+        why: 'The why.',
+        impact: 'The impact.',
+        credibility: 'The credibility.',
+      });
+
+      Date.now = () => 1_000_000;
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+
+      fireEvent.press(screen.getByText('💡 Illuminate'));
+      await waitFor(() => screen.getByText('The summary.'));
+
+      Date.now = () => 1_000_000 + 9_000; // 9s dwell, past the 8s "full read" threshold
+      fireEvent.press(screen.getByText('✕'));
+
+      await waitFor(() =>
+        expect(mockEngagementService.recordIlluminateSession).toHaveBeenCalledWith('BBC', 9_000)
+      );
+      Date.now = realNow;
+    });
+
+    it('records a quick dismissal when the explanation closes almost immediately', async () => {
+      const realNow = Date.now;
+      mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
+      mockAiService.explainNews.mockResolvedValue({
+        summary: 'The summary.',
+        why: 'The why.',
+        impact: 'The impact.',
+        credibility: 'The credibility.',
+      });
+
+      Date.now = () => 1_000_000;
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+
+      fireEvent.press(screen.getByText('💡 Illuminate'));
+      await waitFor(() => screen.getByText('The summary.'));
+
+      Date.now = () => 1_000_000 + 500; // 0.5s dwell
+      fireEvent.press(screen.getByText('✕'));
+
+      await waitFor(() =>
+        expect(mockEngagementService.recordIlluminateSession).toHaveBeenCalledWith('BBC', 500)
+      );
+      Date.now = realNow;
+    });
+
+    it('re-ranks the feed using tracked engagement scores', async () => {
+      mockEngagementService.getEngagementScores.mockResolvedValue({ NPR: 1 });
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ id: 'a', title: 'Story A', source: { name: 'CBC', type: 'rss' } }),
+        makeItem({ id: 'b', title: 'Story B', source: { name: 'CBC', type: 'rss' } }),
+        makeItem({ id: 'c', title: 'Story C', source: { name: 'CBC', type: 'rss' } }),
+        makeItem({ id: 'd', title: 'Story D', source: { name: 'CBC', type: 'rss' } }),
+        makeItem({ id: 'e', title: 'Story E (NPR)', source: { name: 'NPR', type: 'rss' }, url: 'https://example.com/npr' }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('Story E (NPR)'));
+
+      const titles = screen.getAllByText(/^Story [A-E]/).map(node => node.props.children);
+      // A fully-engaged NPR item started last (index 4) should move up.
+      expect(titles.indexOf('Story E (NPR)')).toBeLessThan(4);
+    });
   });
 
   it('filters out a source once it is unchecked in the filter menu', async () => {

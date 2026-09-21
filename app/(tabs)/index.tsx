@@ -1,5 +1,5 @@
 import * as Speech from 'expo-speech';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { CoverageComparisonModal } from '@/components/CoverageComparisonModal';
@@ -13,9 +13,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { aiService } from '@/services/aiService';
 import { briefingService } from '@/services/briefingService';
 import { cacheService } from '@/services/cacheService';
+import { engagementService } from '@/services/engagementService';
 import { newsService } from '@/services/newsService';
 import { PreferenceBucket, preferencesService } from '@/services/preferencesService';
 import { AIExplanation, NewsItem } from '@/types/news';
+import { applyEngagementRanking } from '@/utils/engagementRanking';
 import { logger } from '@/utils/logger';
 import { buildRelatedArticlesIndex } from '@/utils/storyClustering';
 
@@ -44,6 +46,12 @@ export default function HomeScreen() {
 
   const [briefingState, setBriefingState] = useState<BriefingState>('idle');
 
+  const [engagementScores, setEngagementScores] = useState<Record<string, number>>({});
+  // When the currently-open explanation actually became visible (loading
+  // finished) - a ref, not state, since it doesn't need to trigger a
+  // re-render, just be read back in handleCloseModal (§18.2).
+  const explanationReadyAt = useRef<number | null>(null);
+
   const colorScheme = useColorScheme() ?? 'light';
 
   // Stop any in-progress speech if the screen unmounts - otherwise audio
@@ -54,10 +62,23 @@ export default function HomeScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    engagementService.getEngagementScores().then(setEngagementScores);
+  }, []);
+
   // Clustered over the full fetched list, not the source-filtered one - a
   // user who's hidden a source in the filter menu should still be able to
   // discover that it covered a story they're reading elsewhere.
   const relatedArticlesIndex = useMemo(() => buildRelatedArticlesIndex(news), [news]);
+
+  // §18.2 "cheap MVP": a light, bounded re-rank using this device's own
+  // engagement history - see utils/engagementRanking.ts. Recomputed
+  // whenever the feed or the tracked scores change, so it stays current
+  // as the reader engages with more articles in the same session.
+  const rankedNews = useMemo(
+    () => applyEngagementRanking(filteredNews, engagementScores),
+    [filteredNews, engagementScores]
+  );
 
   const loadNews = async (forceRefresh = false) => {
     try {
@@ -182,6 +203,10 @@ export default function HomeScreen() {
 
       const result = await aiService.explainNews(item);
       setExplanation(result);
+      // Dwell time starts once the explanation is actually visible, not
+      // from when the modal opened - the loading spinner shouldn't count
+      // toward "read fully" (§18.2).
+      explanationReadyAt.current = Date.now();
     } catch (error) {
       logger.error('Error getting AI explanation:', error);
     } finally {
@@ -190,6 +215,14 @@ export default function HomeScreen() {
   };
 
   const handleCloseModal = () => {
+    if (selectedItem && explanationReadyAt.current !== null) {
+      const dwellMs = Date.now() - explanationReadyAt.current;
+      engagementService.recordIlluminateSession(selectedItem.source.name, dwellMs).then(() =>
+        engagementService.getEngagementScores().then(setEngagementScores)
+      );
+    }
+    explanationReadyAt.current = null;
+
     setModalVisible(false);
     setSelectedItem(null);
     setExplanation(null);
@@ -235,7 +268,7 @@ export default function HomeScreen() {
 
     setBriefingState('loading');
     try {
-      const topStories = filteredNews.slice(0, BRIEFING_STORY_COUNT);
+      const topStories = rankedNews.slice(0, BRIEFING_STORY_COUNT);
       const preferences = await preferencesService.getPreferences();
       const bucket = preferencesService.getPreferenceBucket(preferences);
       const script = await briefingService.getScript(topStories, bucket);
@@ -312,7 +345,7 @@ export default function HomeScreen() {
       )}
 
       <FlatList
-        data={filteredNews}
+        data={rankedNews}
         keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
