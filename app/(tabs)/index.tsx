@@ -88,9 +88,17 @@ export default function HomeScreen() {
         await newsService.clearCache();
       }
       
-      const items = await newsService.fetchAllNews();
+      // Render each source's articles as soon as it finishes instead of
+      // waiting for all ~13 to settle - one slow/failing source (the CORS
+      // proxy web relies on is intermittently slow) no longer holds the
+      // fast ones hostage. setLoading(false) fires on the very first batch
+      // so the spinner clears the moment there's anything to show.
+      const items = await newsService.fetchAllNews(undefined, partial => {
+        setNews(partial);
+        setLoading(false);
+      });
       setNews(items);
-      
+
       const rss = Array.from(
         new Set(items.filter(item => item.source.type === 'rss').map(item => item.source.name))
       ).sort();

@@ -128,9 +128,17 @@ export class NewsService {
     return items;
   }
 
-  private async fetchRSSNews(): Promise<NewsItem[]> {
+  // onSourceLoaded, when given, fires as soon as each individual feed
+  // finishes (fetch + its own OG image resolution) rather than waiting for
+  // every feed - lets the UI render fast sources immediately instead of
+  // being held hostage by the slowest/failing one.
+  private async fetchRSSNews(onSourceLoaded?: (items: NewsItem[]) => void): Promise<NewsItem[]> {
     const results = await Promise.allSettled(
-      RSS_FEEDS.map(feed => this.fetchSingleRSSFeed(feed))
+      RSS_FEEDS.map(async feed => {
+        const items = await this.fetchSingleRSSFeed(feed);
+        onSourceLoaded?.(items);
+        return items;
+      })
     );
 
     const allItems: NewsItem[] = [];
@@ -163,14 +171,18 @@ export class NewsService {
     return posts;
   }
 
-  private async fetchRedditNews(): Promise<NewsItem[]> {
+  private async fetchRedditNews(onSourceLoaded?: (items: NewsItem[]) => void): Promise<NewsItem[]> {
     const flags = await featureFlagsService.getFlags();
     if (!flags.redditEnabled) {
       return [];
     }
 
     const results = await Promise.allSettled(
-      REDDIT_SUBREDDITS.map(subreddit => this.fetchSingleSubreddit(subreddit))
+      REDDIT_SUBREDDITS.map(async subreddit => {
+        const posts = await this.fetchSingleSubreddit(subreddit);
+        onSourceLoaded?.(posts);
+        return posts;
+      })
     );
 
     const allPosts: NewsItem[] = [];
@@ -231,7 +243,12 @@ export class NewsService {
     return undefined;
   }
 
-  async fetchAllNews(config?: FilterConfig): Promise<NewsItem[]> {
+  // onProgress, when given, fires with the running (deduped/filtered/sorted)
+  // result each time one more source finishes, instead of the caller only
+  // ever seeing the final all-13-feeds result. The return value is still
+  // the same final, complete list either way - onProgress is purely an
+  // early-render hint, not a replacement for awaiting the result.
+  async fetchAllNews(config?: FilterConfig, onProgress?: (partial: NewsItem[]) => void): Promise<NewsItem[]> {
     try {
       const cached = await this.getCachedNews();
       if (cached) {
@@ -240,10 +257,17 @@ export class NewsService {
       }
 
       logger.info('Fetching fresh news data...');
-      
+
+      const accumulated: NewsItem[] = [];
+      const emitProgress = (newItems: NewsItem[]) => {
+        if (!onProgress) return;
+        accumulated.push(...newItems);
+        onProgress(sortPosts(filterPosts(deduplicatePosts(accumulated), config), config));
+      };
+
       const [rssNews, redditNews] = await Promise.all([
-        this.fetchRSSNews(),
-        this.fetchRedditNews(),
+        this.fetchRSSNews(emitProgress),
+        this.fetchRedditNews(emitProgress),
       ]);
 
       const allNews = [...rssNews, ...redditNews];

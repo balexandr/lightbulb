@@ -3,6 +3,7 @@ import axios from 'axios';
 
 import { featureFlagsService } from './featureFlagsService';
 import { deduplicatePosts, filterPosts, NewsService, sortPosts } from './newsService';
+import { RSS_FEEDS } from '@/constants/newsConfig';
 import { NewsItem } from '@/types/news';
 
 jest.mock('axios');
@@ -169,6 +170,52 @@ describe('NewsService caching', () => {
 
     expect(mockedAxios.get).not.toHaveBeenCalled();
     expect(second.length).toBe(first.length);
+  });
+});
+
+describe('NewsService progressive loading', () => {
+  let newsService: NewsService;
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    jest.clearAllMocks();
+    newsService = new NewsService();
+    mockedFlags.getFlags.mockResolvedValue({ redditEnabled: false });
+  });
+
+  function rssXmlFor(title: string): string {
+    return `<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://example.com/${title}</link><pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate></item></channel></rss>`;
+  }
+
+  it('calls onProgress once per source as it resolves, ending with the same result fetchAllNews resolves to', async () => {
+    mockedAxios.get.mockImplementation((url: string) => {
+      const feed = RSS_FEEDS.find(f => f.url === url);
+      return Promise.resolve({ data: rssXmlFor(feed?.name ?? 'Unknown') });
+    });
+
+    const progressSnapshots: number[] = [];
+    const finalResult = await newsService.fetchAllNews(undefined, partial => {
+      progressSnapshots.push(partial.length);
+    });
+
+    expect(progressSnapshots.length).toBeGreaterThan(1);
+    // Monotonically non-decreasing - progress never regresses as more sources arrive.
+    for (let i = 1; i < progressSnapshots.length; i++) {
+      expect(progressSnapshots[i]).toBeGreaterThanOrEqual(progressSnapshots[i - 1]);
+    }
+    expect(progressSnapshots[progressSnapshots.length - 1]).toBe(finalResult.length);
+  });
+
+  it('does not call onProgress at all when the result is served from cache', async () => {
+    mockedAxios.get.mockResolvedValue({ data: rssXmlFor('Cached Headline') });
+    await newsService.fetchAllNews();
+
+    jest.clearAllMocks();
+    const onProgress = jest.fn();
+    await newsService.fetchAllNews(undefined, onProgress);
+
+    expect(onProgress).not.toHaveBeenCalled();
+    expect(mockedAxios.get).not.toHaveBeenCalled();
   });
 });
 

@@ -101,6 +101,32 @@ describe('HomeScreen', () => {
     expect(screen.getByText('BBC')).toBeTruthy();
   });
 
+  it('renders a fast source\'s articles immediately, before a slower source resolves', async () => {
+    const fastItem = makeItem({ id: 'fast', title: 'Fast source headline', source: { name: 'BBC', type: 'rss' } });
+    const slowItem = makeItem({ id: 'slow', title: 'Slow source headline', source: { name: 'NPR', type: 'rss' }, url: 'https://example.com/slow' });
+
+    let resolveSlow: (value: typeof slowItem[]) => void;
+    const slowPromise = new Promise<typeof slowItem[]>(resolve => {
+      resolveSlow = resolve;
+    });
+
+    mockNewsService.fetchAllNews.mockImplementation(async (_config, onProgress) => {
+      onProgress?.([fastItem]);
+      const rest = await slowPromise;
+      const combined = [fastItem, ...rest];
+      onProgress?.(combined);
+      return combined;
+    });
+
+    render(<HomeScreen />);
+
+    await waitFor(() => expect(screen.getByText('Fast source headline')).toBeTruthy());
+    expect(screen.queryByText('Slow source headline')).toBeNull();
+
+    resolveSlow!([slowItem]);
+    await waitFor(() => expect(screen.getByText('Slow source headline')).toBeTruthy());
+  });
+
   it('shows the empty state copy when no articles come back', async () => {
     mockNewsService.fetchAllNews.mockResolvedValue([]);
 
