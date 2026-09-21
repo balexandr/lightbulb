@@ -60,7 +60,7 @@ describe('CoverageComparisonModal', () => {
     );
 
     fireEvent.press(screen.getByText('A headline'));
-    expect(onOpenArticle).toHaveBeenCalledWith('https://example.com/main');
+    expect(onOpenArticle).toHaveBeenCalledWith(mainItem);
   });
 
   it('calls onClose when the close button is pressed', () => {

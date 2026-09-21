@@ -10,7 +10,7 @@ interface CoverageComparisonModalProps {
   onClose: () => void;
   mainItem: NewsItem | null;
   relatedItems: NewsItem[];
-  onOpenArticle: (url: string) => void;
+  onOpenArticle: (item: NewsItem) => void;
 }
 
 // §16.3 #1 - the guide's highest-leverage feature: shows how other outlets
@@ -50,7 +50,7 @@ export function CoverageComparisonModal({ visible, onClose, mainItem, relatedIte
             <TouchableOpacity
               key={item.id}
               style={[styles.card, { borderColor: colorScheme === 'dark' ? '#333' : '#e5e5e5' }]}
-              onPress={() => onOpenArticle(item.url)}
+              onPress={() => onOpenArticle(item)}
             >
               <View style={styles.cardSource}>
                 {item.source.icon && (

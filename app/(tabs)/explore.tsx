@@ -7,16 +7,19 @@ import { ThemedView } from '@/components/themed-view';
 import { Region } from '@/constants/newsConfig';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { crossLeanService } from '@/services/crossLeanService';
 import { AgeRange, preferencesService, UserPreferences } from '@/services/preferencesService';
 
 type PoliticalStandpoint = NonNullable<UserPreferences['politicalStandpoint']>;
 
 export default function ExploreScreen() {
   const [preferences, setPreferences] = useState<UserPreferences>({});
+  const [crossLeanCount, setCrossLeanCount] = useState(0);
   const colorScheme = useColorScheme() ?? 'light';
 
   useEffect(() => {
     loadPreferences();
+    crossLeanService.getMonthlyCount().then(setCrossLeanCount);
   }, []);
 
   const loadPreferences = async () => {
@@ -157,6 +160,16 @@ export default function ExploreScreen() {
                 ℹ️ Impact analysis will be tailored to a {preferences.politicalStandpoint}{' '}
                 perspective while maintaining objectivity in summaries and credibility
                 assessments.
+              </ThemedText>
+            </ThemedView>
+          )}
+
+          {preferences.politicalStandpoint && (
+            <ThemedView style={styles.crossLeanBox}>
+              <ThemedText style={styles.crossLeanText}>
+                {crossLeanCount === 0
+                  ? "You haven't read from a differently-leaning source this month."
+                  : `You've read from ${crossLeanCount} differently-leaning ${crossLeanCount === 1 ? 'source' : 'sources'} this month.`}
               </ThemedText>
             </ThemedView>
           )}
@@ -348,6 +361,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     opacity: 0.9,
+  },
+  crossLeanBox: {
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(128, 128, 128, 0.08)',
+  },
+  crossLeanText: {
+    fontSize: 13,
+    lineHeight: 20,
+    opacity: 0.7,
   },
   comingSoonText: {
     fontSize: 14,

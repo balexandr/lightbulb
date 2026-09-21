@@ -8,6 +8,7 @@ import * as Speech from 'expo-speech';
 import { aiService } from '@/services/aiService';
 import { briefingService } from '@/services/briefingService';
 import { cacheService } from '@/services/cacheService';
+import { crossLeanService } from '@/services/crossLeanService';
 import { engagementService } from '@/services/engagementService';
 import { newsService } from '@/services/newsService';
 import { preferencesService } from '@/services/preferencesService';
@@ -47,6 +48,10 @@ jest.mock('@/services/engagementService', () => ({
   },
 }));
 
+jest.mock('@/services/crossLeanService', () => ({
+  crossLeanService: { recordOpen: jest.fn() },
+}));
+
 jest.mock('expo-speech', () => ({
   speak: jest.fn(),
   stop: jest.fn(),
@@ -57,6 +62,7 @@ const mockAiService = aiService as jest.Mocked<typeof aiService>;
 const mockCacheService = cacheService as jest.Mocked<typeof cacheService>;
 const mockBriefingService = briefingService as jest.Mocked<typeof briefingService>;
 const mockEngagementService = engagementService as jest.Mocked<typeof engagementService>;
+const mockCrossLeanService = crossLeanService as jest.Mocked<typeof crossLeanService>;
 const mockSpeech = Speech as jest.Mocked<typeof Speech>;
 
 function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
@@ -76,6 +82,7 @@ describe('HomeScreen', () => {
     mockCacheService.getExplanation.mockResolvedValue({ fact: null, relevance: null });
     mockEngagementService.getEngagementScores.mockResolvedValue({});
     mockEngagementService.recordIlluminateSession.mockResolvedValue();
+    mockCrossLeanService.recordOpen.mockResolvedValue();
     jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined as any);
   });
@@ -236,6 +243,37 @@ describe('HomeScreen', () => {
 
     await waitFor(() => expect(screen.queryByText('NPR story')).toBeNull());
     expect(screen.getByText('BBC story')).toBeTruthy();
+  });
+
+  describe('cross-lean open tracking (§17.7)', () => {
+    it('records an open when the source has a different lean than the reader\'s stance', async () => {
+      await preferencesService.savePreferences({ politicalStandpoint: 'progressive' });
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ source: { name: 'NYTimes', type: 'rss' } }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+      fireEvent.press(screen.getByText('A big headline'));
+
+      await waitFor(() =>
+        expect(mockCrossLeanService.recordOpen).toHaveBeenCalledWith('progressive', 'NYTimes', 'left-leaning')
+      );
+    });
+
+    it('does not record an open for a source with no RSS_FEEDS entry (e.g. Reddit)', async () => {
+      await preferencesService.savePreferences({ politicalStandpoint: 'conservative' });
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ source: { name: 'r/worldnews', type: 'reddit' } }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+      fireEvent.press(screen.getByText('A big headline'));
+
+      await waitFor(() => expect(Linking.openURL).toHaveBeenCalled());
+      expect(mockCrossLeanService.recordOpen).not.toHaveBeenCalled();
+    });
   });
 
   describe('hyperlocal default selection (§17.4)', () => {

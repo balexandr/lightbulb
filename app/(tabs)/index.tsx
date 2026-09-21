@@ -13,6 +13,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { aiService } from '@/services/aiService';
 import { briefingService } from '@/services/briefingService';
 import { cacheService } from '@/services/cacheService';
+import { crossLeanService } from '@/services/crossLeanService';
 import { engagementService } from '@/services/engagementService';
 import { FlagReason, flagService } from '@/services/flagService';
 import { newsService } from '@/services/newsService';
@@ -148,16 +149,26 @@ export default function HomeScreen() {
     loadNews(true);
   };
 
-  const handleOpenArticle = async (url: string) => {
+  const handleOpenArticle = async (item: NewsItem) => {
     try {
-      const supported = await Linking.canOpenURL(url);
+      const supported = await Linking.canOpenURL(item.url);
       if (supported) {
-        await Linking.openURL(url);
+        await Linking.openURL(item.url);
       } else {
-        logger.error('Cannot open URL:', url);
+        logger.error('Cannot open URL:', item.url);
       }
     } catch (error) {
       logger.error('Error opening URL:', error);
+    }
+
+    // §17.7 - fire-and-forget, purely descriptive tracking; never blocks
+    // opening the article. Only sources tagged with a lean (§13/§17.7) can
+    // register a cross-lean open - Reddit sources have no RSS_FEEDS entry.
+    const sourceConfig = RSS_FEEDS.find(feed => feed.name === item.source.name);
+    if (sourceConfig) {
+      const preferences = await preferencesService.getPreferences();
+      const bucket = preferencesService.getPreferenceBucket(preferences);
+      crossLeanService.recordOpen(bucket.stance, item.source.name, sourceConfig.lean);
     }
   };
 
@@ -358,13 +369,13 @@ export default function HomeScreen() {
         }
         renderItem={({ item }) => (
           <ThemedView style={styles.card}>
-            <TouchableOpacity onPress={() => handleOpenArticle(item.url)}>
+            <TouchableOpacity onPress={() => handleOpenArticle(item)}>
               <ThemedText type="defaultSemiBold" numberOfLines={3} style={styles.titleLink}>
                 {item.title}
               </ThemedText>
             </TouchableOpacity>
             {item.imageUrl && (
-              <TouchableOpacity onPress={() => handleOpenArticle(item.url)}>
+              <TouchableOpacity onPress={() => handleOpenArticle(item)}>
                 <View style={styles.imageContainer}>
                   <Image 
                     source={{ uri: item.imageUrl }}
