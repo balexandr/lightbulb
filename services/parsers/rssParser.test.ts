@@ -5,6 +5,7 @@ const feedConfig = {
   url: 'https://example.com/rss.xml',
   icon: 'https://example.com/favicon.ico',
   fallbackImage: 'https://example.com/fallback.png',
+  trust: { outletType: 'digital-native' as const, hasCorrectionsPolicy: true, bylineTransparency: true },
 };
 
 function wrapFeed(itemsXml: string): string {

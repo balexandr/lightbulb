@@ -1,10 +1,31 @@
 import React from 'react';
 import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { OutletType, RSS_FEEDS, SourceTrustInfo } from '@/constants/newsConfig';
 import { AccentColor, Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
+
+const OUTLET_TYPE_LABELS: Record<OutletType, string> = {
+  'public-broadcaster': 'Public broadcaster',
+  'newspaper': 'Newspaper',
+  'digital-native': 'Digital-native outlet',
+  'link-aggregator': 'Link aggregator',
+};
+
+// §17.2: three factual signals, not a rolled-up score - see
+// constants/newsConfig.ts for why and the per-source data.
+function describeTrust(trust: SourceTrustInfo): string {
+  if (trust.outletType === 'link-aggregator') {
+    return `${OUTLET_TYPE_LABELS[trust.outletType]} · aggregates links, no editorial process of its own`;
+  }
+
+  const parts = [OUTLET_TYPE_LABELS[trust.outletType]];
+  parts.push(trust.hasCorrectionsPolicy ? 'corrections policy' : 'no published corrections policy');
+  parts.push(trust.bylineTransparency ? 'bylined' : 'not consistently bylined');
+  return parts.join(' · ');
+}
 
 interface FilterMenuProps {
   visible: boolean;
@@ -74,24 +95,35 @@ export function FilterMenu({
                     📰 News Outlets
                   </ThemedText>
                 </View>
-                {rssSources.map(source => (
-                  <TouchableOpacity
-                    key={source}
-                    style={styles.sourceItem}
-                    onPress={() => onToggleSource(source)}
-                  >
-                    <View style={[
-                      styles.checkbox,
-                      selectedSources.has(source) && styles.checkboxSelected,
-                      { borderColor: isDark ? '#666' : '#ccc' }
-                    ]}>
-                      {selectedSources.has(source) && (
-                        <Text style={styles.checkmark}>✓</Text>
-                      )}
-                    </View>
-                    <ThemedText style={styles.sourceName}>{source}</ThemedText>
-                  </TouchableOpacity>
-                ))}
+                <ThemedText style={styles.methodologyNote}>
+                  We show a few factual signals per source below, not a single trust score.
+                </ThemedText>
+                {rssSources.map(source => {
+                  const trust = RSS_FEEDS.find(feed => feed.name === source)?.trust;
+                  return (
+                    <TouchableOpacity
+                      key={source}
+                      style={styles.sourceItem}
+                      onPress={() => onToggleSource(source)}
+                    >
+                      <View style={[
+                        styles.checkbox,
+                        selectedSources.has(source) && styles.checkboxSelected,
+                        { borderColor: isDark ? '#666' : '#ccc' }
+                      ]}>
+                        {selectedSources.has(source) && (
+                          <Text style={styles.checkmark}>✓</Text>
+                        )}
+                      </View>
+                      <View style={styles.sourceTextContainer}>
+                        <ThemedText style={styles.sourceName}>{source}</ThemedText>
+                        {trust && (
+                          <ThemedText style={styles.sourceTrust}>{describeTrust(trust)}</ThemedText>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
 
@@ -248,8 +280,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  sourceTextContainer: {
+    flex: 1,
+  },
   sourceName: {
     fontSize: 15,
+  },
+  sourceTrust: {
+    fontSize: 11,
+    opacity: 0.55,
+    marginTop: 2,
+  },
+  methodologyNote: {
+    fontSize: 12,
+    opacity: 0.6,
+    marginBottom: 12,
+    lineHeight: 16,
   },
   applyButton: {
     margin: 16,

@@ -54,4 +54,26 @@ describe('FilterMenu', () => {
     fireEvent.press(screen.getByText('Apply Filter'));
     expect(props.onClose).toHaveBeenCalledTimes(2);
   });
+
+  describe('source trust signals (§17.2)', () => {
+    it('shows the methodology note explaining these are signals, not a score', () => {
+      renderMenu();
+      expect(screen.getByText(/not a single trust score/)).toBeTruthy();
+    });
+
+    it('shows outlet type and checklist for a known source', () => {
+      renderMenu({ rssSources: ['BBC'] });
+      expect(screen.getByText(/Public broadcaster.*corrections policy.*bylined/)).toBeTruthy();
+    });
+
+    it('describes a link aggregator differently from a newsroom', () => {
+      renderMenu({ rssSources: ['Hacker News'] });
+      expect(screen.getByText(/Link aggregator.*no editorial process of its own/)).toBeTruthy();
+    });
+
+    it('renders gracefully for a source with no matching trust data', () => {
+      expect(() => renderMenu({ rssSources: ['Some Unlisted Source'] })).not.toThrow();
+      expect(screen.getByText('Some Unlisted Source')).toBeTruthy();
+    });
+  });
 });
