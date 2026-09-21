@@ -6,6 +6,7 @@ const feedConfig = {
   icon: 'https://example.com/favicon.ico',
   fallbackImage: 'https://example.com/fallback.png',
   trust: { outletType: 'digital-native' as const, hasCorrectionsPolicy: true, bylineTransparency: true },
+  lean: 'not-applicable' as const,
 };
 
 function wrapFeed(itemsXml: string): string {

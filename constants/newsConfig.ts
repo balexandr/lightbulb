@@ -15,6 +15,17 @@ export interface SourceTrustInfo {
   bylineTransparency: boolean;
 }
 
+// §17.7: a coarse, self-assessed general characterization used only to
+// detect when a reader opens a source unlike their own stated political
+// stance - not a scientific rating, and individual articles from any outlet
+// can cut against its general lean. 'not-applicable' is for sources that
+// aren't general-interest political-news editorial outlets (tech trade
+// press, link aggregators) - they never count toward or against the §17.7
+// count either way. Same self-assessed caveat as §17.2/§13's source list -
+// verify/revisit before leaning on this for anything beyond the in-app
+// transparency framing §17.7 requires.
+export type LeanTag = 'left-leaning' | 'center' | 'right-leaning' | 'not-applicable';
+
 // §17.4: the small set of regions this app currently has (or buckets
 // preferences into) - not a full state list. "philadelphia" is its own
 // value rather than folded into "northeast" because it's the one region
@@ -28,6 +39,7 @@ export interface RSSFeedConfig {
   icon: string;
   fallbackImage: string;
   trust: SourceTrustInfo;
+  lean: LeanTag;
   // Set only for hyperlocal sources - grouped into their own "Local News"
   // section in the Filter Menu and auto-selected by default for readers
   // whose region bucket matches (see app/(tabs)/index.tsx).
@@ -41,6 +53,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://www.bbc.com/favicon.ico',
     fallbackImage: 'https://www.bbc.co.uk/iplayer/images/bbc-blocks-dark.png',
     trust: { outletType: 'public-broadcaster', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'center',
   },
   {
     name: 'NPR',
@@ -48,6 +61,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://media.npr.org/chrome/favicon/favicon.ico',
     fallbackImage: 'https://prod-eks-static-assets.npr.org/chrome_svg/npr-logo-2025.svg',
     trust: { outletType: 'public-broadcaster', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'left-leaning',
   },
   {
     name: 'Ars Technica',
@@ -55,6 +69,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://arstechnica.com/favicon.ico',
     fallbackImage: 'https://cdn.arstechnica.net/wp-content/uploads/2016/10/cropped-ars-logo-512_480-270x270.png',
     trust: { outletType: 'digital-native', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'not-applicable', // tech trade press, not general political-news coverage
   },
   {
     name: 'TechCrunch',
@@ -62,6 +77,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://techcrunch.com/wp-content/uploads/2015/02/cropped-cropped-favicon-gradient.png',
     fallbackImage: 'https://techcrunch.com/wp-content/uploads/2015/02/cropped-cropped-favicon-gradient.png',
     trust: { outletType: 'digital-native', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'not-applicable',
   },
   {
     name: 'The Guardian',
@@ -69,6 +85,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://www.theguardian.com/favicon.ico',
     fallbackImage: 'https://assets.guim.co.uk/images/guardian-logo-rss.c45beb1bafa34b347ac333af2e6fe23f.png',
     trust: { outletType: 'newspaper', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'left-leaning',
   },
   {
     name: 'Al Jazeera',
@@ -76,6 +93,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://www.aljazeera.com/favicon.ico',
     fallbackImage: 'https://www.aljazeera.com/images/logo_aje.png',
     trust: { outletType: 'public-broadcaster', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'left-leaning',
   },
   {
     name: 'CBC',
@@ -83,6 +101,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://www.cbc.ca/favicon.ico',
     fallbackImage: 'https://www.cbc.ca/favicon.ico',
     trust: { outletType: 'public-broadcaster', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'center',
   },
   {
     name: 'NYTimes',
@@ -90,6 +109,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://www.nytimes.com/favicon.ico',
     fallbackImage: 'https://static01.nyt.com/images/icons/t_logo_291_black.png',
     trust: { outletType: 'newspaper', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'left-leaning',
   },
   {
     name: 'Wired',
@@ -97,6 +117,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://www.wired.com/favicon.ico',
     fallbackImage: 'https://www.wired.com/verso/static/wired/assets/favicon.ico',
     trust: { outletType: 'digital-native', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'not-applicable',
   },
   {
     name: 'Engadget',
@@ -104,6 +125,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://www.engadget.com/apple-touch-icon.png',
     fallbackImage: 'https://www.engadget.com/apple-touch-icon.png',
     trust: { outletType: 'digital-native', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'not-applicable',
   },
   {
     name: 'Hacker News',
@@ -113,6 +135,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     // Not a newsroom - a user-submitted link aggregator, so "corrections
     // policy" and "byline" don't map the way they do for the other sources.
     trust: { outletType: 'link-aggregator', hasCorrectionsPolicy: false, bylineTransparency: false },
+    lean: 'not-applicable',
   },
   // §17.4 hyperlocal layer. Fetched and confirmed live RSS 2.0 with real
   // items as of 2026-09-21 (§11's own instruction - a search-engine result
@@ -125,6 +148,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://whyy.org/favicon.ico',
     fallbackImage: 'https://whyy.org/favicon.ico',
     trust: { outletType: 'public-broadcaster', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'center',
     localRegion: 'philadelphia',
   },
   {
@@ -133,6 +157,7 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     icon: 'https://billypenn.com/favicon.ico',
     fallbackImage: 'https://billypenn.com/favicon.ico',
     trust: { outletType: 'digital-native', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'center',
     localRegion: 'philadelphia',
   },
 ];
