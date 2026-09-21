@@ -1,3 +1,4 @@
+import * as Speech from 'expo-speech';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -10,12 +11,16 @@ import { DISABLED_BY_DEFAULT_SOURCES } from '@/constants/newsConfig';
 import { AccentColor, Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { aiService } from '@/services/aiService';
+import { briefingService } from '@/services/briefingService';
 import { cacheService } from '@/services/cacheService';
 import { newsService } from '@/services/newsService';
 import { PreferenceBucket, preferencesService } from '@/services/preferencesService';
 import { AIExplanation, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
 import { buildRelatedArticlesIndex } from '@/utils/storyClustering';
+
+const BRIEFING_STORY_COUNT = 5;
+type BriefingState = 'idle' | 'loading' | 'speaking' | 'error';
 
 export default function HomeScreen() {
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -37,7 +42,17 @@ export default function HomeScreen() {
   const [comparisonItem, setComparisonItem] = useState<NewsItem | null>(null);
   const [comparisonVisible, setComparisonVisible] = useState(false);
 
+  const [briefingState, setBriefingState] = useState<BriefingState>('idle');
+
   const colorScheme = useColorScheme() ?? 'light';
+
+  // Stop any in-progress speech if the screen unmounts - otherwise audio
+  // would keep playing after the user navigates away.
+  useEffect(() => {
+    return () => {
+      Speech.stop();
+    };
+  }, []);
 
   // Clustered over the full fetched list, not the source-filtered one - a
   // user who's hidden a source in the filter menu should still be able to
@@ -198,6 +213,38 @@ export default function HomeScreen() {
     setFilterMenuVisible(false);
   };
 
+  const handleToggleBriefing = async () => {
+    if (briefingState === 'speaking') {
+      await Speech.stop();
+      setBriefingState('idle');
+      return;
+    }
+    if (briefingState === 'loading') {
+      return;
+    }
+
+    setBriefingState('loading');
+    try {
+      const topStories = filteredNews.slice(0, BRIEFING_STORY_COUNT);
+      const preferences = await preferencesService.getPreferences();
+      const bucket = preferencesService.getPreferenceBucket(preferences);
+      const script = await briefingService.getScript(topStories, bucket);
+
+      setBriefingState('speaking');
+      Speech.speak(script, {
+        onDone: () => setBriefingState('idle'),
+        onStopped: () => setBriefingState('idle'),
+        onError: (error) => {
+          logger.error('Error speaking briefing:', error);
+          setBriefingState('idle');
+        },
+      });
+    } catch (error) {
+      logger.error('Error generating briefing:', error);
+      setBriefingState('error');
+    }
+  };
+
   const totalSources = rssSources.length + redditSources.length;
 
   if (loading) {
@@ -238,6 +285,21 @@ export default function HomeScreen() {
           )}
         </View>
       </ThemedView>
+
+      {filteredNews.length > 0 && (
+        <TouchableOpacity
+          style={styles.briefingBanner}
+          onPress={handleToggleBriefing}
+          disabled={briefingState === 'loading'}
+        >
+          <Text style={styles.briefingText}>
+            {briefingState === 'loading' && '⏳ Preparing your briefing...'}
+            {briefingState === 'speaking' && '⏹ Stop briefing'}
+            {briefingState === 'error' && '⚠️ Briefing unavailable — tap to retry'}
+            {briefingState === 'idle' && '🎧 Listen to your daily briefing'}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <FlatList
         data={filteredNews}
@@ -377,6 +439,19 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+  },
+  briefingBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 193, 7, 0.12)',
+  },
+  briefingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: AccentColor,
   },
   logo: {
     fontSize: 36,

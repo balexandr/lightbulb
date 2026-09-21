@@ -3,7 +3,10 @@ import { Linking, RefreshControl } from 'react-native';
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
+import * as Speech from 'expo-speech';
+
 import { aiService } from '@/services/aiService';
+import { briefingService } from '@/services/briefingService';
 import { cacheService } from '@/services/cacheService';
 import { newsService } from '@/services/newsService';
 import { preferencesService } from '@/services/preferencesService';
@@ -30,9 +33,22 @@ jest.mock('@/services/cacheService', () => ({
   },
 }));
 
+jest.mock('@/services/briefingService', () => ({
+  briefingService: {
+    getScript: jest.fn(),
+  },
+}));
+
+jest.mock('expo-speech', () => ({
+  speak: jest.fn(),
+  stop: jest.fn(),
+}));
+
 const mockNewsService = newsService as jest.Mocked<typeof newsService>;
 const mockAiService = aiService as jest.Mocked<typeof aiService>;
 const mockCacheService = cacheService as jest.Mocked<typeof cacheService>;
+const mockBriefingService = briefingService as jest.Mocked<typeof briefingService>;
+const mockSpeech = Speech as jest.Mocked<typeof Speech>;
 
 function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
   return {
@@ -170,6 +186,62 @@ describe('HomeScreen', () => {
     await waitFor(() => expect(screen.getByText('🔀 Coverage Comparison')).toBeTruthy());
     // Appears once in the feed card behind the modal, once inside the modal.
     expect(screen.getAllByText('Senate passes sweeping climate legislation bill')).toHaveLength(2);
+  });
+
+  describe('daily briefing', () => {
+    it('generates a script for the top stories and speaks it', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
+      mockBriefingService.getScript.mockResolvedValue('Good morning, here is your briefing.');
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+
+      fireEvent.press(screen.getByText('🎧 Listen to your daily briefing'));
+
+      await waitFor(() => expect(mockBriefingService.getScript).toHaveBeenCalled());
+      await waitFor(() => expect(mockSpeech.speak).toHaveBeenCalledWith(
+        'Good morning, here is your briefing.',
+        expect.objectContaining({ onDone: expect.any(Function) })
+      ));
+      await waitFor(() => expect(screen.getByText('⏹ Stop briefing')).toBeTruthy());
+    });
+
+    it('stops speech and resets to idle when tapped again while speaking', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
+      mockBriefingService.getScript.mockResolvedValue('A script.');
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+
+      fireEvent.press(screen.getByText('🎧 Listen to your daily briefing'));
+      await waitFor(() => screen.getByText('⏹ Stop briefing'));
+
+      fireEvent.press(screen.getByText('⏹ Stop briefing'));
+
+      expect(mockSpeech.stop).toHaveBeenCalled();
+      await waitFor(() => expect(screen.getByText('🎧 Listen to your daily briefing')).toBeTruthy());
+    });
+
+    it('returns to idle and never calls speak when the briefing request fails', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
+      mockBriefingService.getScript.mockRejectedValue(new Error('Too many requests.'));
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+
+      fireEvent.press(screen.getByText('🎧 Listen to your daily briefing'));
+
+      await waitFor(() => expect(screen.getByText(/Briefing unavailable/)).toBeTruthy());
+      expect(mockSpeech.speak).not.toHaveBeenCalled();
+    });
+
+    it('does not show the briefing banner when there are no articles', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([]);
+      render(<HomeScreen />);
+
+      await waitFor(() => expect(screen.getByText(/No articles from selected sources/)).toBeTruthy());
+      expect(screen.queryByText('🎧 Listen to your daily briefing')).toBeNull();
+    });
   });
 
   it('force-refreshes and clears the cache on pull-to-refresh', async () => {
