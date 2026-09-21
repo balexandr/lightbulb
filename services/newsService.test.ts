@@ -106,6 +106,72 @@ describe('NewsService Reddit gating', () => {
   });
 });
 
+describe('NewsService proxy retry', () => {
+  let newsService: NewsService;
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    jest.clearAllMocks();
+    newsService = new NewsService();
+    mockedFlags.getFlags.mockResolvedValue({ redditEnabled: false });
+  });
+
+  it('recovers a feed that fails once but succeeds on retry (transient proxy blip)', async () => {
+    const rssXml = `<?xml version="1.0"?><rss><channel><item><title>Headline</title><link>https://example.com/a</link><pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate></item></channel></rss>`;
+    mockedAxios.get.mockImplementation((url: string) => {
+      const calls = mockedAxios.get.mock.calls.filter(([calledUrl]) => calledUrl === url).length;
+      if (calls === 1) {
+        return Promise.reject(new Error('transient proxy failure'));
+      }
+      return Promise.resolve({ data: rssXml });
+    });
+
+    const items = await newsService.fetchAllNews();
+
+    expect(items.length).toBeGreaterThan(0);
+  });
+
+  it('gives up on a feed after every retry attempt fails', async () => {
+    mockedAxios.get.mockRejectedValue(new Error('sustained proxy outage'));
+
+    const items = await newsService.fetchAllNews();
+
+    expect(items).toEqual([]);
+  });
+});
+
+describe('NewsService caching', () => {
+  let newsService: NewsService;
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    jest.clearAllMocks();
+    newsService = new NewsService();
+    mockedFlags.getFlags.mockResolvedValue({ redditEnabled: false });
+  });
+
+  it('does not cache a totally empty result, so the next load retries instead of staying empty', async () => {
+    mockedAxios.get.mockRejectedValue(new Error('sustained proxy outage'));
+
+    await newsService.fetchAllNews();
+    expect(await AsyncStorage.getItem('@lightbulb_news_cache')).toBeNull();
+  });
+
+  it('caches a non-empty result and serves it back without refetching', async () => {
+    const rssXml = `<?xml version="1.0"?><rss><channel><item><title>Headline</title><link>https://example.com/a</link><pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate></item></channel></rss>`;
+    mockedAxios.get.mockResolvedValue({ data: rssXml });
+
+    const first = await newsService.fetchAllNews();
+    expect(first.length).toBeGreaterThan(0);
+
+    jest.clearAllMocks();
+    const second = await newsService.fetchAllNews();
+
+    expect(mockedAxios.get).not.toHaveBeenCalled();
+    expect(second.length).toBe(first.length);
+  });
+});
+
 describe('sortPosts', () => {
   it('sorts by publish date, newest first', () => {
     const older = makeItem({ id: 'older', publishedAt: new Date('2024-01-01') });

@@ -81,12 +81,29 @@ export function sortPosts(posts: NewsItem[], config: FilterConfig = DEFAULT_FILT
   });
 }
 
+// The free CORS proxy web relies on (api.allorigins.win) is observed to be
+// intermittently unreliable - sometimes a clean fast response, sometimes a
+// Cloudflare 522 after ~20s. One retry with a fresh request meaningfully
+// improves odds without ballooning worst-case latency too much, since a
+// transient blip (as opposed to a sustained outage) is the common case.
+async function axiosGetWithRetry(url: string, config: Parameters<typeof axios.get>[1], attempts = 2) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await axios.get(url, config);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
 export class NewsService {
   private async fetchSingleRSSFeed(feed: RSSFeedConfig): Promise<NewsItem[]> {
     const feedUrl = getCorsProxyUrl(feed.url);
 
-    const response = await axios.get(feedUrl, {
-      timeout: 15000,
+    const response = await axiosGetWithRetry(feedUrl, {
+      timeout: 10000,
       headers: getRequestHeaders(true),
     });
 
@@ -132,7 +149,7 @@ export class NewsService {
     const redditUrl = `https://www.reddit.com/r/${subreddit}/hot.json?limit=25`;
     const url = getCorsProxyUrl(redditUrl);
 
-    const response = await axios.get(url, {
+    const response = await axiosGetWithRetry(url, {
       timeout: 10000,
       headers: getRequestHeaders(false),
     });
@@ -234,7 +251,14 @@ export class NewsService {
       const filtered = filterPosts(deduplicated, config);
       const sorted = sortPosts(filtered, config);
 
-      await this.cacheNews(sorted);
+      // Don't cache a totally empty result - it's much more likely every
+      // feed failed (e.g. the CORS proxy web relies on having a bad few
+      // minutes) than that there's genuinely nothing to show, and caching
+      // it would make the next load keep serving "no articles" for
+      // NEWS_DURATION instead of naturally retrying.
+      if (sorted.length > 0) {
+        await this.cacheNews(sorted);
+      }
 
       logger.success(`Fetched ${sorted.length} news items (${rssNews.length} RSS, ${redditNews.length} Reddit, removed ${allNews.length - deduplicated.length} duplicates)`);
       return sorted;
