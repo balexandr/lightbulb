@@ -7,6 +7,10 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
+const REGION_LABELS: Record<string, string> = {
+  philadelphia: 'Philadelphia, PA',
+};
+
 const OUTLET_TYPE_LABELS: Record<OutletType, string> = {
   'public-broadcaster': 'Public broadcaster',
   'newspaper': 'Newspaper',
@@ -51,6 +55,38 @@ export function FilterMenu({
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
 
+  // §17.4: sources tagged with a localRegion get their own section instead
+  // of blending into the national outlet list.
+  const localSources = rssSources.filter(source => RSS_FEEDS.find(feed => feed.name === source)?.localRegion);
+  const nationalSources = rssSources.filter(source => !RSS_FEEDS.find(feed => feed.name === source)?.localRegion);
+
+  const renderSourceRow = (source: string) => {
+    const trust = RSS_FEEDS.find(feed => feed.name === source)?.trust;
+    return (
+      <TouchableOpacity
+        key={source}
+        style={styles.sourceItem}
+        onPress={() => onToggleSource(source)}
+      >
+        <View style={[
+          styles.checkbox,
+          selectedSources.has(source) && styles.checkboxSelected,
+          { borderColor: isDark ? '#666' : '#ccc' }
+        ]}>
+          {selectedSources.has(source) && (
+            <Text style={styles.checkmark}>✓</Text>
+          )}
+        </View>
+        <View style={styles.sourceTextContainer}>
+          <ThemedText style={styles.sourceName}>{source}</ThemedText>
+          {trust && (
+            <ThemedText style={styles.sourceTrust}>{describeTrust(trust)}</ThemedText>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -88,7 +124,32 @@ export function FilterMenu({
           </View>
 
           <ScrollView style={styles.scrollView}>
-            {rssSources.length > 0 && (
+            {localSources.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionTitleContainer}>
+                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+                    📍 Local News
+                  </ThemedText>
+                </View>
+                <ThemedText style={styles.methodologyNote}>
+                  Hyperlocal coverage for readers in that area - set your region in Preferences to
+                  have it show up in your feed by default.
+                </ThemedText>
+                {localSources.map(source => {
+                  const region = RSS_FEEDS.find(feed => feed.name === source)?.localRegion;
+                  return (
+                    <View key={source}>
+                      {renderSourceRow(source)}
+                      {region && (
+                        <ThemedText style={styles.localRegionTag}>{REGION_LABELS[region] ?? region}</ThemedText>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {nationalSources.length > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionTitleContainer}>
                   <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
@@ -98,32 +159,7 @@ export function FilterMenu({
                 <ThemedText style={styles.methodologyNote}>
                   We show a few factual signals per source below, not a single trust score.
                 </ThemedText>
-                {rssSources.map(source => {
-                  const trust = RSS_FEEDS.find(feed => feed.name === source)?.trust;
-                  return (
-                    <TouchableOpacity
-                      key={source}
-                      style={styles.sourceItem}
-                      onPress={() => onToggleSource(source)}
-                    >
-                      <View style={[
-                        styles.checkbox,
-                        selectedSources.has(source) && styles.checkboxSelected,
-                        { borderColor: isDark ? '#666' : '#ccc' }
-                      ]}>
-                        {selectedSources.has(source) && (
-                          <Text style={styles.checkmark}>✓</Text>
-                        )}
-                      </View>
-                      <View style={styles.sourceTextContainer}>
-                        <ThemedText style={styles.sourceName}>{source}</ThemedText>
-                        {trust && (
-                          <ThemedText style={styles.sourceTrust}>{describeTrust(trust)}</ThemedText>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                {nationalSources.map(renderSourceRow)}
               </View>
             )}
 
@@ -296,6 +332,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     marginBottom: 12,
     lineHeight: 16,
+  },
+  localRegionTag: {
+    fontSize: 11,
+    opacity: 0.6,
+    marginLeft: 44,
+    marginTop: -8,
+    marginBottom: 8,
   },
   applyButton: {
     margin: 16,

@@ -76,4 +76,27 @@ describe('FilterMenu', () => {
       expect(screen.getByText('Some Unlisted Source')).toBeTruthy();
     });
   });
+
+  describe('hyperlocal layer (§17.4)', () => {
+    it('groups a source tagged with a local region into its own section, separate from national outlets', () => {
+      renderMenu({ rssSources: ['BBC', 'WHYY'] });
+
+      expect(screen.getByText('📍 Local News')).toBeTruthy();
+      expect(screen.getByText('Philadelphia, PA')).toBeTruthy();
+      // WHYY appears once, under Local News, not duplicated under News Outlets.
+      expect(screen.getAllByText('WHYY')).toHaveLength(1);
+      expect(screen.getByText('BBC')).toBeTruthy();
+    });
+
+    it('omits the Local News section when no local sources are present', () => {
+      renderMenu({ rssSources: ['BBC', 'NPR'] });
+      expect(screen.queryByText('📍 Local News')).toBeNull();
+    });
+
+    it('still toggles a local source like any other source', () => {
+      const props = renderMenu({ rssSources: ['WHYY'] });
+      fireEvent.press(screen.getByText('WHYY'));
+      expect(props.onToggleSource).toHaveBeenCalledWith('WHYY');
+    });
+  });
 });

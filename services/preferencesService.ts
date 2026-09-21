@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { Region } from '@/constants/newsConfig';
 import { logger } from '@/utils/logger';
 
 export type AgeRange = '18-24' | '25-34' | '35-44' | '45-54' | '55-64' | '65+';
@@ -8,17 +9,17 @@ export interface UserPreferences {
   politicalStandpoint?: 'progressive' | 'liberal' | 'moderate' | 'conservative' | 'libertarian';
   ageRange?: AgeRange;
   gender?: string;
-  location?: string;
+  // A coarse region, not a precise location - never city/zip (§12.4). §17.4
+  // is the first consumer (surfacing a "Local News" section for
+  // 'philadelphia'), but any region-tailored feature can read this.
+  location?: Region;
 }
 
 // A small fixed set unrelated users share cache entries across (see
 // docs/TECHNICAL_GUIDE.md §14.3) - never the raw preference values.
 export type AgeBucket = AgeRange | 'unspecified';
 export type StanceBucket = NonNullable<UserPreferences['politicalStandpoint']> | 'unspecified';
-// Reserved for when location collection ships (explore.tsx currently lists
-// it under "Coming Soon") - always 'unspecified' until then. Once it does,
-// bucket it to state/region level, never city/zip (§12.4).
-export type RegionBucket = 'unspecified';
+export type RegionBucket = Region | 'unspecified';
 
 export interface PreferenceBucket {
   age: AgeBucket;
@@ -76,7 +77,7 @@ class PreferencesService {
     return {
       age: preferences.ageRange ?? 'unspecified',
       stance: preferences.politicalStandpoint ?? 'unspecified',
-      region: 'unspecified',
+      region: preferences.location ?? 'unspecified',
     };
   }
 }

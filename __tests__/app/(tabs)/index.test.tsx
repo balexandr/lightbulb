@@ -155,6 +155,33 @@ describe('HomeScreen', () => {
     expect(screen.getByText('BBC story')).toBeTruthy();
   });
 
+  describe('hyperlocal default selection (§17.4)', () => {
+    it('does not default-select a local source for a reader with no matching region', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ id: 'bbc-item', title: 'BBC story', source: { name: 'BBC', type: 'rss' } }),
+        makeItem({ id: 'whyy-item', title: 'WHYY story', source: { name: 'WHYY', type: 'rss' }, url: 'https://example.com/whyy' }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('BBC story'));
+
+      expect(screen.queryByText('WHYY story')).toBeNull();
+    });
+
+    it('default-selects a matching local source for a reader in that region', async () => {
+      await preferencesService.savePreferences({ location: 'philadelphia' });
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ id: 'bbc-item', title: 'BBC story', source: { name: 'BBC', type: 'rss' } }),
+        makeItem({ id: 'whyy-item', title: 'WHYY story', source: { name: 'WHYY', type: 'rss' }, url: 'https://example.com/whyy' }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('BBC story'));
+
+      expect(screen.getByText('WHYY story')).toBeTruthy();
+    });
+  });
+
   it('shows a coverage comparison pill only for articles with a clustered match, and opens the comparison modal', async () => {
     mockNewsService.fetchAllNews.mockResolvedValue([
       makeItem({

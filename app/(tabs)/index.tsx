@@ -7,7 +7,7 @@ import { FilterMenu } from '@/components/FilterMenu';
 import { IlluminateModal } from '@/components/IlluminateModal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DISABLED_BY_DEFAULT_SOURCES } from '@/constants/newsConfig';
+import { DISABLED_BY_DEFAULT_SOURCES, RSS_FEEDS } from '@/constants/newsConfig';
 import { AccentColor, Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { aiService } from '@/services/aiService';
@@ -80,9 +80,19 @@ export default function HomeScreen() {
       setRedditSources(reddit);
       
       if (selectedSources.size === 0) {
-        const defaultSources = [...rss, ...reddit].filter(
-          source => !DISABLED_BY_DEFAULT_SOURCES.includes(source as any)
-        );
+        // §17.4: a hyperlocal source is only on by default for readers
+        // whose region bucket matches it - everyone else can still find
+        // and enable it manually in the Filter Menu.
+        const preferences = await preferencesService.getPreferences();
+        const userRegion = preferencesService.getPreferenceBucket(preferences).region;
+
+        const defaultSources = [...rss, ...reddit].filter(source => {
+          if (DISABLED_BY_DEFAULT_SOURCES.includes(source as any)) {
+            return false;
+          }
+          const localRegion = RSS_FEEDS.find(feed => feed.name === source)?.localRegion;
+          return !localRegion || localRegion === userRegion;
+        });
         setSelectedSources(new Set(defaultSources));
       }
     } catch (error) {

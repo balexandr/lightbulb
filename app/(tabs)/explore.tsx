@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Region } from '@/constants/newsConfig';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AgeRange, preferencesService, UserPreferences } from '@/services/preferencesService';
@@ -41,6 +42,15 @@ export default function ExploreScreen() {
     await preferencesService.savePreferences(newPrefs);
   };
 
+  const handleLocationChange = async (location: Region) => {
+    const newPrefs = {
+      ...preferences,
+      location: preferences.location === location ? undefined : location,
+    };
+    setPreferences(newPrefs);
+    await preferencesService.savePreferences(newPrefs);
+  };
+
   const politicalOptions: { value: PoliticalStandpoint; label: string; description: string }[] = [
     {
       value: 'progressive',
@@ -70,6 +80,15 @@ export default function ExploreScreen() {
   ];
 
   const ageRangeOptions: AgeRange[] = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
+
+  const locationOptions: { value: Region; label: string }[] = [
+    { value: 'philadelphia', label: 'Philadelphia, PA' },
+    { value: 'northeast', label: 'Northeast (other)' },
+    { value: 'midwest', label: 'Midwest' },
+    { value: 'south', label: 'South' },
+    { value: 'west', label: 'West' },
+    { value: 'outside-us', label: 'Outside the U.S.' },
+  ];
 
   return (
     <ThemedView style={styles.container}>
@@ -186,12 +205,53 @@ export default function ExploreScreen() {
 
         <ThemedView style={styles.section}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Location
+          </ThemedText>
+          <ThemedText style={styles.sectionDescription}>
+            A general region, not your exact location - used for relevance and, where available,
+            local news (currently just Philadelphia)
+          </ThemedText>
+
+          <View style={styles.ageRangeContainer}>
+            {locationOptions.map((option) => {
+              const isSelected = preferences.location === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.ageRangeButton,
+                    {
+                      backgroundColor: isSelected
+                        ? Colors[colorScheme].tint
+                        : colorScheme === 'dark'
+                        ? '#2C2C2E'
+                        : '#F2F2F7',
+                      borderColor: isSelected ? Colors[colorScheme].tint : 'transparent',
+                    },
+                  ]}
+                  onPress={() => handleLocationChange(option.value)}
+                >
+                  <Text
+                    style={[
+                      styles.ageRangeText,
+                      { color: isSelected ? '#000000' : Colors[colorScheme].text },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ThemedView>
+
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
             Coming Soon
           </ThemedText>
           <ThemedText style={styles.comingSoonText}>
-            • Location-specific impacts
-            {'\n'}• Custom interests and topics
-            {'\n'}• Personalized news sources
+            • Custom interests and topics
+            {'\n'}• More hyperlocal city coverage
           </ThemedText>
         </ThemedView>
 

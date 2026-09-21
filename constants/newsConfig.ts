@@ -15,12 +15,23 @@ export interface SourceTrustInfo {
   bylineTransparency: boolean;
 }
 
+// §17.4: the small set of regions this app currently has (or buckets
+// preferences into) - not a full state list. "philadelphia" is its own
+// value rather than folded into "northeast" because it's the one region
+// with an actual hyperlocal source layer right now (see RSS_FEEDS below);
+// extend this as more hyperlocal layers get built, not preemptively.
+export type Region = 'philadelphia' | 'northeast' | 'midwest' | 'south' | 'west' | 'outside-us';
+
 export interface RSSFeedConfig {
   name: string;
   url: string;
   icon: string;
   fallbackImage: string;
   trust: SourceTrustInfo;
+  // Set only for hyperlocal sources - grouped into their own "Local News"
+  // section in the Filter Menu and auto-selected by default for readers
+  // whose region bucket matches (see app/(tabs)/index.tsx).
+  localRegion?: Region;
 }
 
 export const RSS_FEEDS: RSSFeedConfig[] = [
@@ -103,6 +114,27 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     // policy" and "byline" don't map the way they do for the other sources.
     trust: { outletType: 'link-aggregator', hasCorrectionsPolicy: false, bylineTransparency: false },
   },
+  // §17.4 hyperlocal layer. Fetched and confirmed live RSS 2.0 with real
+  // items as of 2026-09-21 (§11's own instruction - a search-engine result
+  // isn't enough). WHYY's general feed mixes in some non-article "Newscast"
+  // audio-segment stubs alongside real articles - acceptable noise, not
+  // disqualifying, similar to other sources' known quirks (§8).
+  {
+    name: 'WHYY',
+    url: 'https://whyy.org/feed/',
+    icon: 'https://whyy.org/favicon.ico',
+    fallbackImage: 'https://whyy.org/favicon.ico',
+    trust: { outletType: 'public-broadcaster', hasCorrectionsPolicy: true, bylineTransparency: true },
+    localRegion: 'philadelphia',
+  },
+  {
+    name: 'Billy Penn',
+    url: 'https://billypenn.com/feed/',
+    icon: 'https://billypenn.com/favicon.ico',
+    fallbackImage: 'https://billypenn.com/favicon.ico',
+    trust: { outletType: 'digital-native', hasCorrectionsPolicy: true, bylineTransparency: true },
+    localRegion: 'philadelphia',
+  },
 ];
 
 // Whether Reddit fetching is enabled is a server-driven feature flag now
@@ -137,7 +169,9 @@ export const TRUSTED_NEWS_DOMAINS = [
   'aljazeera.com',
   'theguardian.com',
   'wired.com',
-  'engadget.com'
+  'engadget.com',
+  'whyy.org',
+  'billypenn.com'
 ] as const;
 
 export const CACHE_CONFIG = {

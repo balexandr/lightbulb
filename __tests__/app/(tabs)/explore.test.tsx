@@ -72,6 +72,33 @@ describe('ExploreScreen', () => {
     );
   });
 
+  it('saves a location selection', async () => {
+    render(<ExploreScreen />);
+    await waitFor(() => expect(mockPreferencesService.getPreferences).toHaveBeenCalled());
+
+    fireEvent.press(screen.getByText('Philadelphia, PA'));
+
+    await waitFor(() =>
+      expect(mockPreferencesService.savePreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ location: 'philadelphia' })
+      )
+    );
+  });
+
+  it('deselects a location when tapped again', async () => {
+    mockPreferencesService.getPreferences.mockResolvedValue({ location: 'philadelphia' });
+    render(<ExploreScreen />);
+    await waitFor(() => expect(mockPreferencesService.getPreferences).toHaveBeenCalled());
+
+    fireEvent.press(screen.getByText('Philadelphia, PA'));
+
+    await waitFor(() =>
+      expect(mockPreferencesService.savePreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ location: undefined })
+      )
+    );
+  });
+
   it('links to the Privacy Policy and Terms of Service', async () => {
     render(<ExploreScreen />);
     await waitFor(() => expect(mockPreferencesService.getPreferences).toHaveBeenCalled());
