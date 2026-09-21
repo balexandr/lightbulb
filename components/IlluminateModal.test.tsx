@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { IlluminateModal } from './IlluminateModal';
 
@@ -46,6 +46,57 @@ describe('IlluminateModal', () => {
 
     fireEvent.press(screen.getByText('✕'));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  describe('"flag this explanation" (§18.5)', () => {
+    it('does not show the flag affordance when onFlag is not provided', () => {
+      render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} />);
+      expect(screen.queryByText('🚩 Flag this explanation')).toBeNull();
+    });
+
+    it('opens a reason picker when the flag affordance is tapped', () => {
+      render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} onFlag={jest.fn()} />);
+
+      fireEvent.press(screen.getByText('🚩 Flag this explanation'));
+
+      expect(screen.getByText('Wrong')).toBeTruthy();
+      expect(screen.getByText('Off')).toBeTruthy();
+      expect(screen.getByText('Too persuasive')).toBeTruthy();
+    });
+
+    it('disables submit until a reason is selected', () => {
+      render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} onFlag={jest.fn()} />);
+
+      fireEvent.press(screen.getByText('🚩 Flag this explanation'));
+      fireEvent.press(screen.getByText('Submit flag'));
+
+      expect(screen.getByText('Submit flag')).toBeTruthy();
+      expect(screen.queryByText('Thanks — this has been flagged.')).toBeNull();
+    });
+
+    it('submits the selected reason and optional free text, then shows a confirmation', async () => {
+      const onFlag = jest.fn().mockResolvedValue(undefined);
+      render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} onFlag={onFlag} />);
+
+      fireEvent.press(screen.getByText('🚩 Flag this explanation'));
+      fireEvent.press(screen.getByText('Too persuasive'));
+      fireEvent.changeText(screen.getByPlaceholderText('Add details (optional)'), 'This nudged an opinion.');
+      fireEvent.press(screen.getByText('Submit flag'));
+
+      await waitFor(() => expect(screen.getByText('Thanks — this has been flagged.')).toBeTruthy());
+      expect(onFlag).toHaveBeenCalledWith('too_persuasive', 'This nudged an opinion.');
+    });
+
+    it('submits without free text when none is entered', async () => {
+      const onFlag = jest.fn().mockResolvedValue(undefined);
+      render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} onFlag={onFlag} />);
+
+      fireEvent.press(screen.getByText('🚩 Flag this explanation'));
+      fireEvent.press(screen.getByText('Wrong'));
+      fireEvent.press(screen.getByText('Submit flag'));
+
+      await waitFor(() => expect(onFlag).toHaveBeenCalledWith('wrong', undefined));
+    });
   });
 
   describe('"show your work" transparency section', () => {

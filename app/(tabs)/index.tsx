@@ -14,6 +14,7 @@ import { aiService } from '@/services/aiService';
 import { briefingService } from '@/services/briefingService';
 import { cacheService } from '@/services/cacheService';
 import { engagementService } from '@/services/engagementService';
+import { FlagReason, flagService } from '@/services/flagService';
 import { newsService } from '@/services/newsService';
 import { PreferenceBucket, preferencesService } from '@/services/preferencesService';
 import { AIExplanation, NewsItem } from '@/types/news';
@@ -230,6 +231,11 @@ export default function HomeScreen() {
     setFromCache(false);
   };
 
+  const handleFlag = async (flaggedField: FlagReason, freeText?: string) => {
+    if (!selectedItem || !explanationBucket) return;
+    await flagService.submitFlag({ url: selectedItem.url, bucket: explanationBucket, flaggedField, freeText });
+  };
+
   const handleToggleSource = (source: string) => {
     const newSelected = new Set(selectedSources);
     if (newSelected.has(source)) {
@@ -410,6 +416,7 @@ export default function HomeScreen() {
         fromCache={fromCache}
         explanation={explanation ?? undefined}
         bucket={explanationBucket ?? undefined}
+        onFlag={handleFlag}
       />
 
       <FilterMenu
