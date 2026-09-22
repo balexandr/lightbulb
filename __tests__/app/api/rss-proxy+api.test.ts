@@ -75,12 +75,56 @@ describe('GET /api/rss-proxy', () => {
     });
 
     const ip = `10.0.3.${++ipCounter}`;
-    for (let i = 0; i < 120; i++) {
+    for (let i = 0; i < 300; i++) {
       const response = await GET(makeRequest(RSS_FEEDS[0].url, ip));
       expect(response.status).toBe(200);
     }
 
     const limited = await GET(makeRequest(RSS_FEEDS[0].url, ip));
     expect(limited.status).toBe(429);
+  });
+
+  describe('trusted-domain article pages (for OG-image scraping)', () => {
+    it('allows an https article URL on a TRUSTED_NEWS_DOMAINS host, even though the exact URL is unknown ahead of time', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/html' }),
+        text: async () => '<html><head><meta property="og:image" content="https://techcrunch.com/photo.jpg"/></head></html>',
+      });
+
+      const response = await GET(makeRequest('https://techcrunch.com/2026/09/22/some-article/'));
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain('og:image');
+    });
+
+    it('allows a subdomain of a trusted domain', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/html' }),
+        text: async () => '<html></html>',
+      });
+
+      const response = await GET(makeRequest('https://www.bbc.com/news/some-article'));
+      expect(response.status).toBe(200);
+    });
+
+    it('rejects a domain that merely contains a trusted domain as a substring', async () => {
+      const response = await GET(makeRequest('https://not-techcrunch.com/phishing'));
+      expect(response.status).toBe(403);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-https URL even on a trusted domain', async () => {
+      const response = await GET(makeRequest('http://techcrunch.com/insecure'));
+      expect(response.status).toBe(403);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects an untrusted domain entirely', async () => {
+      const response = await GET(makeRequest('https://random-blog.example.com/post'));
+      expect(response.status).toBe(403);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
   });
 });

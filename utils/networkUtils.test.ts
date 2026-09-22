@@ -1,30 +1,6 @@
 import { Platform } from 'react-native';
 
-import { getCorsProxyUrl, getFeedProxyUrl, getRequestHeaders } from './networkUtils';
-
-describe('getCorsProxyUrl', () => {
-  const originalOS = Platform.OS;
-
-  afterEach(() => {
-    Platform.OS = originalOS;
-  });
-
-  it('routes through the allorigins CORS proxy on web', () => {
-    Platform.OS = 'web';
-    const url = getCorsProxyUrl('https://example.com/feed.xml?a=1&b=2');
-    expect(url).toBe(
-      `https://api.allorigins.win/raw?url=${encodeURIComponent('https://example.com/feed.xml?a=1&b=2')}`
-    );
-  });
-
-  it('returns the URL unchanged on native platforms', () => {
-    Platform.OS = 'ios';
-    expect(getCorsProxyUrl('https://example.com/feed.xml')).toBe('https://example.com/feed.xml');
-
-    Platform.OS = 'android';
-    expect(getCorsProxyUrl('https://example.com/feed.xml')).toBe('https://example.com/feed.xml');
-  });
-});
+import { getFeedProxyUrl, getRequestHeaders } from './networkUtils';
 
 describe('getFeedProxyUrl', () => {
   const originalOS = Platform.OS;

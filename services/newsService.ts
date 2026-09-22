@@ -7,7 +7,7 @@ import { redditParser, RedditPostRaw } from '@/services/parsers/redditParser';
 import { rssParser } from '@/services/parsers/rssParser';
 import { FilterConfig, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
-import { getCorsProxyUrl, getFeedProxyUrl, getRequestHeaders } from '@/utils/networkUtils';
+import { getFeedProxyUrl, getRequestHeaders } from '@/utils/networkUtils';
 
 export function deduplicatePosts(posts: NewsItem[]): NewsItem[] {
   const seen = new Map<string, NewsItem>();
@@ -213,13 +213,14 @@ export class NewsService {
 
   private async fetchOgImage(articleUrl: string): Promise<string | undefined> {
     try {
-      const url = getCorsProxyUrl(articleUrl);
+      // Routed through our own /api/rss-proxy on web (allowlisted by
+      // trusted domain, see that route) rather than the third-party CORS
+      // proxy - sources with no embedded RSS image at all (e.g.
+      // TechCrunch) depend entirely on this succeeding for every article.
+      const url = getFeedProxyUrl(articleUrl);
       const response = await axios.get(url, {
         timeout: 8000,
-        headers: {
-          'Accept': 'text/html',
-          ...(!url.includes('allorigins') && { 'User-Agent': 'Lightbulb News App/1.0' }),
-        },
+        headers: { 'Accept': 'text/html', 'User-Agent': 'Lightbulb News App/1.0' },
         // The full page is downloaded (axios has no way to stop after
         // </head>); we only limit how much of it we scan below.
         responseType: 'text',

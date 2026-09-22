@@ -4,19 +4,12 @@ import { Platform } from 'react-native';
  * Network utilities for handling CORS and headers
  */
 
-export function getCorsProxyUrl(url: string): string {
-  if (Platform.OS === 'web') {
-    return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-  }
-  return url;
-}
-
-// For our own known RSS/Reddit feed URLs specifically - routes through this
-// app's own /api/rss-proxy (server-side fetch, no CORS involved) instead of
-// the third-party proxy above, which has been observed to have full
-// outages. See app/api/rss-proxy+api.ts for why this is safe as an
-// allowlisted route where getCorsProxyUrl (arbitrary article URLs, for OG
-// image scraping) wouldn't be.
+// Routes RSS/Reddit feed fetches and article-page OG-image scraping through
+// this app's own /api/rss-proxy (server-side fetch, no CORS involved)
+// instead of a third-party CORS proxy, which was observed to have full
+// outages. That route allowlists both our exact known feed URLs and
+// article pages on TRUSTED_NEWS_DOMAINS - see app/api/rss-proxy+api.ts for
+// why this is safe rather than an open relay.
 export function getFeedProxyUrl(url: string): string {
   if (Platform.OS === 'web') {
     return `${getApiBaseUrl()}/api/rss-proxy?url=${encodeURIComponent(url)}`;
