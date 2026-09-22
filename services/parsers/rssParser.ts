@@ -99,7 +99,14 @@ export class RSSParser {
     return largeIcon || feedConfig.fallbackImage;
   }
 
-  private isValidImage(url: string): boolean {
+  // Below this, an image looks visibly soft/blurry once stretched to fill
+  // a full-width, 200pt-tall card (see app/(tabs)/index.tsx's
+  // styles.articleImage) - well above the old 50px floor, which really only
+  // ever caught literal tracking pixels, not genuinely undersized thumbnails
+  // like BBC's 240x135 (see isValidImage).
+  private static readonly MIN_IMAGE_DIMENSION = 300;
+
+  private isValidImage(url: string, width?: number, height?: number): boolean {
     if (!url) return false;
 
     // Filter out tracking pixels and invalid images
@@ -119,17 +126,33 @@ export class RSSParser {
       return false;
     }
 
-    // Check minimum size if dimensions are in URL
+    // Prefer explicit dimensions (from XML/HTML attributes the feed itself
+    // provides) over guessing from the URL text - far more reliable, and
+    // the reason an undersized thumbnail could previously slip through
+    // unflagged whenever its URL didn't happen to contain a literal
+    // "NxN" substring.
+    if (width !== undefined && height !== undefined) {
+      return width >= RSSParser.MIN_IMAGE_DIMENSION && height >= RSSParser.MIN_IMAGE_DIMENSION;
+    }
+
     const sizeMatch = url.match(/(\d+)x(\d+)/);
     if (sizeMatch) {
-      const width = parseInt(sizeMatch[1]);
-      const height = parseInt(sizeMatch[2]);
-      if (width < 50 || height < 50) {
+      const urlWidth = parseInt(sizeMatch[1]);
+      const urlHeight = parseInt(sizeMatch[2]);
+      if (urlWidth < RSSParser.MIN_IMAGE_DIMENSION || urlHeight < RSSParser.MIN_IMAGE_DIMENSION) {
         return false;
       }
     }
 
     return true;
+  }
+
+  // BBC's own RSS <media:thumbnail> only ever advertises a small 240x135
+  // rendition, but its CDN serves the same asset at several larger widths
+  // via this URL pattern (verified directly against the live CDN) - swap
+  // in a much larger one instead of accepting the undersized default.
+  private upsizeIfBbcThumbnail(url: string): string {
+    return url.replace(/(ichef\.bbci\.co\.uk\/ace\/standard\/)\d+(\/)/, '$1976$2');
   }
 
   private extractImageUrl(
@@ -141,45 +164,49 @@ export class RSSParser {
     // Try multiple image extraction methods in order of preference
 
     // 1. Try media:content
-    let imageUrl = this.extractMediaContent(item);
-    if (imageUrl && this.isValidImage(imageUrl)) {
-      logger.debug(`Found image from media:content for ${feedConfig.name}`, imageUrl);
-      return imageUrl;
+    const mediaContent = this.extractMediaContent(item);
+    if (mediaContent && this.isValidImage(mediaContent.url, mediaContent.width, mediaContent.height)) {
+      logger.debug(`Found image from media:content for ${feedConfig.name}`, mediaContent.url);
+      return mediaContent.url;
     }
 
     // 2. Try media:thumbnail
-    imageUrl = attrOf(item['media:thumbnail'], 'url');
-    if (imageUrl && this.isValidImage(imageUrl)) {
-      logger.debug(`Found image from media:thumbnail for ${feedConfig.name}`, imageUrl);
-      return imageUrl;
+    const thumbnailUrl = attrOf(item['media:thumbnail'], 'url');
+    if (thumbnailUrl) {
+      const width = attrOf(item['media:thumbnail'], 'width');
+      const height = attrOf(item['media:thumbnail'], 'height');
+      const upsized = this.upsizeIfBbcThumbnail(thumbnailUrl);
+      const isUpsized = upsized !== thumbnailUrl;
+      // The upsized rendition is known-larger by construction - skip
+      // re-validating its (now stale) original width/height attributes.
+      if (isUpsized || this.isValidImage(thumbnailUrl, width ? Number(width) : undefined, height ? Number(height) : undefined)) {
+        logger.debug(`Found image from media:thumbnail for ${feedConfig.name}`, upsized);
+        return upsized;
+      }
     }
 
     // 3. Try enclosure
-    imageUrl = attrOf(item.enclosure, 'url');
-    if (imageUrl && this.isValidImage(imageUrl)) {
-      logger.debug(`Found image from enclosure for ${feedConfig.name}`, imageUrl);
-      return imageUrl;
+    const enclosureUrl = attrOf(item.enclosure, 'url');
+    if (enclosureUrl && this.isValidImage(enclosureUrl)) {
+      logger.debug(`Found image from enclosure for ${feedConfig.name}`, enclosureUrl);
+      return enclosureUrl;
     }
 
-    // 4. For NPR, extract from content:encoded
+    // 4. For NPR and others, extract from content:encoded
     if (contentEncoded) {
-      // Extract first <img> tag from content:encoded
-      const imgMatch = contentEncoded.match(/<img[^>]+src=['"]([^'"]+)['"]/);
-      if (imgMatch) {
-        const foundUrl = imgMatch[1];
-        if (this.isValidImage(foundUrl)) {
-          logger.debug(`Found image from content:encoded for ${feedConfig.name}`, foundUrl);
-          return foundUrl;
-        }
+      const foundUrl = this.extractFirstValidImgTag(contentEncoded);
+      if (foundUrl) {
+        logger.debug(`Found image from content:encoded for ${feedConfig.name}`, foundUrl);
+        return foundUrl;
       }
     }
 
     // 5. Extract from description HTML
     if (description) {
-      const imgMatch = description.match(/<img[^>]+src="([^">]+)"/);
-      if (imgMatch && this.isValidImage(imgMatch[1])) {
-        logger.debug(`Found image from description for ${feedConfig.name}`, imgMatch[1]);
-        return imgMatch[1];
+      const foundUrl = this.extractFirstValidImgTag(description);
+      if (foundUrl) {
+        logger.debug(`Found image from description for ${feedConfig.name}`, foundUrl);
+        return foundUrl;
       }
     }
 
@@ -188,15 +215,57 @@ export class RSSParser {
     return undefined;
   }
 
-  private extractMediaContent(item: Record<string, unknown>): string | null {
-    const candidates = asArray(item['media:content'] as any);
+  // Scans every <img> tag in the given HTML (content:encoded or
+  // description), not just the first - a feed can legitimately list a
+  // tracking pixel before or after the real photo (see NPR's
+  // content:encoded), so stopping at the first tag and giving up if it
+  // fails validation was silently discarding perfectly good images later
+  // in the same markup. Matches both quote styles - CBC's feed uses single
+  // quotes, which the old description-only regex (double-quote-only)
+  // never matched at all.
+  private extractFirstValidImgTag(html: string): string | undefined {
+    const imgTags = html.match(/<img\b[^>]*>/gi) ?? [];
 
-    // Prefer one explicitly marked as an image
-    const imageCandidate = candidates.find(candidate => attrOf(candidate, 'medium') === 'image');
-    const chosen = imageCandidate ?? candidates[0];
+    for (const tag of imgTags) {
+      const srcMatch = tag.match(/\bsrc=["']([^"']+)["']/i);
+      if (!srcMatch) continue;
 
-    const url = chosen ? attrOf(chosen, 'url') : '';
-    return url || null;
+      const url = srcMatch[1];
+      const widthMatch = tag.match(/\bwidth=["']?(\d+)/i);
+      const heightMatch = tag.match(/\bheight=["']?(\d+)/i);
+      const width = widthMatch ? Number(widthMatch[1]) : undefined;
+      const height = heightMatch ? Number(heightMatch[1]) : undefined;
+
+      if (this.isValidImage(url, width, height)) {
+        return url;
+      }
+    }
+
+    return undefined;
+  }
+
+  private extractMediaContent(item: Record<string, unknown>): { url: string; width?: number; height?: number } | null {
+    const candidates = asArray(item['media:content'] as any)
+      .map(candidate => ({
+        url: attrOf(candidate, 'url'),
+        medium: attrOf(candidate, 'medium'),
+        width: attrOf(candidate, 'width') ? Number(attrOf(candidate, 'width')) : undefined,
+        height: attrOf(candidate, 'height') ? Number(attrOf(candidate, 'height')) : undefined,
+      }))
+      .filter(candidate => candidate.url);
+
+    if (candidates.length === 0) return null;
+
+    // Prefer ones explicitly marked as an image; within that pool (or all
+    // candidates, if none are marked), prefer the largest by width - some
+    // feeds (e.g. the Guardian) list several sizes with no `medium`
+    // attribute and no guaranteed order, so blindly taking "the first one"
+    // can silently pick the smallest rendition available.
+    const imageCandidates = candidates.filter(candidate => candidate.medium === 'image');
+    const pool = imageCandidates.length > 0 ? imageCandidates : candidates;
+    const chosen = pool.reduce((best, candidate) => ((candidate.width ?? 0) > (best.width ?? 0) ? candidate : best));
+
+    return chosen;
   }
 }
 

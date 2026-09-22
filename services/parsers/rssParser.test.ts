@@ -138,6 +138,72 @@ describe('RSSParser.parseFeed', () => {
     expect(items[0].imageUrl).toBeUndefined();
   });
 
+  it('rejects an image below the 300px minimum even without a matching URL-text hint', () => {
+    const xml = wrapFeed(`
+      <item>
+        <title>Blurry</title>
+        <link>https://example.com/blurry</link>
+        <media:thumbnail width="240" height="135" url="https://example.com/opaque-asset-id.jpg" />
+      </item>
+    `);
+
+    const items = rssParser.parseFeed(xml, feedConfig);
+    expect(items[0].imageUrl).toBeUndefined();
+  });
+
+  it('upsizes an undersized BBC thumbnail instead of rejecting it', () => {
+    const xml = wrapFeed(`
+      <item>
+        <title>BBC story</title>
+        <link>https://example.com/bbc-story</link>
+        <media:thumbnail width="240" height="135" url="https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/abc/live/photo.jpg" />
+      </item>
+    `);
+
+    const items = rssParser.parseFeed(xml, feedConfig);
+    expect(items[0].imageUrl).toBe('https://ichef.bbci.co.uk/ace/standard/976/cpsprodpb/abc/live/photo.jpg');
+  });
+
+  it('prefers the largest media:content candidate when none is marked medium="image"', () => {
+    const xml = wrapFeed(`
+      <item>
+        <title>Guardian-style</title>
+        <link>https://example.com/guardian-style</link>
+        <media:content width="140" url="https://example.com/small.jpg" />
+        <media:content width="460" url="https://example.com/large.jpg" />
+      </item>
+    `);
+
+    const items = rssParser.parseFeed(xml, feedConfig);
+    expect(items[0].imageUrl).toBe('https://example.com/large.jpg');
+  });
+
+  it('matches single-quoted <img> tags in description HTML, not just double-quoted', () => {
+    const xml = wrapFeed(`
+      <item>
+        <title>CBC-style</title>
+        <link>https://example.com/cbc-style</link>
+        <description><![CDATA[<img src='https://example.com/photo.jpg' width='620' height='349' />]]></description>
+      </item>
+    `);
+
+    const items = rssParser.parseFeed(xml, feedConfig);
+    expect(items[0].imageUrl).toBe('https://example.com/photo.jpg');
+  });
+
+  it('skips a tracking pixel and uses the next valid <img> tag in the same content', () => {
+    const xml = wrapFeed(`
+      <item>
+        <title>NPR-style</title>
+        <link>https://example.com/npr-style</link>
+        <content:encoded><![CDATA[<img src='https://example.com/real-photo-600x400.jpg' /><p>Caption</p><img src='https://example.com/tracking-pixel.png' />]]></content:encoded>
+      </item>
+    `);
+
+    const items = rssParser.parseFeed(xml, feedConfig);
+    expect(items[0].imageUrl).toBe('https://example.com/real-photo-600x400.jpg');
+  });
+
   it('returns an empty list for a feed with no items', () => {
     const xml = wrapFeed('');
     expect(rssParser.parseFeed(xml, feedConfig)).toEqual([]);
