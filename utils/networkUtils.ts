@@ -11,6 +11,19 @@ export function getCorsProxyUrl(url: string): string {
   return url;
 }
 
+// For our own known RSS/Reddit feed URLs specifically - routes through this
+// app's own /api/rss-proxy (server-side fetch, no CORS involved) instead of
+// the third-party proxy above, which has been observed to have full
+// outages. See app/api/rss-proxy+api.ts for why this is safe as an
+// allowlisted route where getCorsProxyUrl (arbitrary article URLs, for OG
+// image scraping) wouldn't be.
+export function getFeedProxyUrl(url: string): string {
+  if (Platform.OS === 'web') {
+    return `${getApiBaseUrl()}/api/rss-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 export function getRequestHeaders(isRSS: boolean = false): Record<string, string> {
   const headers: Record<string, string> = {
     'Accept': isRSS

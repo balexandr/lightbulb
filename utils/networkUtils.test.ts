@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { getCorsProxyUrl, getRequestHeaders } from './networkUtils';
+import { getCorsProxyUrl, getFeedProxyUrl, getRequestHeaders } from './networkUtils';
 
 describe('getCorsProxyUrl', () => {
   const originalOS = Platform.OS;
@@ -23,6 +23,28 @@ describe('getCorsProxyUrl', () => {
 
     Platform.OS = 'android';
     expect(getCorsProxyUrl('https://example.com/feed.xml')).toBe('https://example.com/feed.xml');
+  });
+});
+
+describe('getFeedProxyUrl', () => {
+  const originalOS = Platform.OS;
+
+  afterEach(() => {
+    Platform.OS = originalOS;
+  });
+
+  it('routes through the first-party /api/rss-proxy route on web', () => {
+    Platform.OS = 'web';
+    const url = getFeedProxyUrl('https://feeds.bbci.co.uk/news/world/rss.xml');
+    expect(url).toBe(`/api/rss-proxy?url=${encodeURIComponent('https://feeds.bbci.co.uk/news/world/rss.xml')}`);
+  });
+
+  it('returns the URL unchanged on native platforms', () => {
+    Platform.OS = 'ios';
+    expect(getFeedProxyUrl('https://feeds.bbci.co.uk/news/world/rss.xml')).toBe('https://feeds.bbci.co.uk/news/world/rss.xml');
+
+    Platform.OS = 'android';
+    expect(getFeedProxyUrl('https://feeds.bbci.co.uk/news/world/rss.xml')).toBe('https://feeds.bbci.co.uk/news/world/rss.xml');
   });
 });
 

@@ -7,7 +7,7 @@ import { redditParser, RedditPostRaw } from '@/services/parsers/redditParser';
 import { rssParser } from '@/services/parsers/rssParser';
 import { FilterConfig, NewsItem } from '@/types/news';
 import { logger } from '@/utils/logger';
-import { getCorsProxyUrl, getRequestHeaders } from '@/utils/networkUtils';
+import { getCorsProxyUrl, getFeedProxyUrl, getRequestHeaders } from '@/utils/networkUtils';
 
 export function deduplicatePosts(posts: NewsItem[]): NewsItem[] {
   const seen = new Map<string, NewsItem>();
@@ -100,7 +100,7 @@ async function axiosGetWithRetry(url: string, config: Parameters<typeof axios.ge
 
 export class NewsService {
   private async fetchSingleRSSFeed(feed: RSSFeedConfig): Promise<NewsItem[]> {
-    const feedUrl = getCorsProxyUrl(feed.url);
+    const feedUrl = getFeedProxyUrl(feed.url);
 
     const response = await axiosGetWithRetry(feedUrl, {
       timeout: 10000,
@@ -155,7 +155,7 @@ export class NewsService {
 
   private async fetchSingleSubreddit(subreddit: typeof REDDIT_SUBREDDITS[number]): Promise<NewsItem[]> {
     const redditUrl = `https://www.reddit.com/r/${subreddit}/hot.json?limit=25`;
-    const url = getCorsProxyUrl(redditUrl);
+    const url = getFeedProxyUrl(redditUrl);
 
     const response = await axiosGetWithRetry(url, {
       timeout: 10000,
