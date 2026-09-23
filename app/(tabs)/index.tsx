@@ -1,3 +1,4 @@
+import { Image as ExpoImage } from 'expo-image';
 import * as Speech from 'expo-speech';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -385,10 +386,11 @@ export default function HomeScreen() {
             {item.imageUrl && (
               <TouchableOpacity onPress={() => handleOpenArticle(item)}>
                 <View style={styles.imageContainer}>
-                  <Image 
+                  <ExpoImage
                     source={{ uri: item.imageUrl }}
                     style={styles.articleImage}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    contentPosition="top"
                   />
                 </View>
               </TouchableOpacity>
