@@ -48,6 +48,7 @@ describe('getPreferenceBucket', () => {
       age: 'unspecified',
       stance: 'unspecified',
       region: 'unspecified',
+      gender: 'unspecified',
     });
   });
 
@@ -58,6 +59,7 @@ describe('getPreferenceBucket', () => {
       age: '25-34',
       stance: 'progressive',
       region: 'unspecified',
+      gender: 'unspecified',
     });
   });
 
@@ -66,6 +68,16 @@ describe('getPreferenceBucket', () => {
       age: 'unspecified',
       stance: 'unspecified',
       region: 'philadelphia',
+      gender: 'unspecified',
+    });
+  });
+
+  it('passes gender through as-is, since it is already a small fixed enum', () => {
+    expect(preferencesService.getPreferenceBucket({ gender: 'non-binary' })).toEqual({
+      age: 'unspecified',
+      stance: 'unspecified',
+      region: 'unspecified',
+      gender: 'non-binary',
     });
   });
 });

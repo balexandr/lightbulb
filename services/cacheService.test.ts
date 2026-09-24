@@ -15,7 +15,7 @@ function makeItem(url: string): NewsItem {
 }
 
 function makeBucket(overrides: Partial<PreferenceBucket> = {}): PreferenceBucket {
-  return { age: 'unspecified', stance: 'unspecified', region: 'unspecified', ...overrides };
+  return { age: 'unspecified', stance: 'unspecified', region: 'unspecified', gender: 'unspecified', ...overrides };
 }
 
 function makeFact(): FactLayer {

@@ -22,7 +22,7 @@ jest.mock('./preferencesService', () => ({
 const mockCacheService = cacheService as jest.Mocked<typeof cacheService>;
 const mockPreferencesService = preferencesService as jest.Mocked<typeof preferencesService>;
 
-const unspecifiedBucket: PreferenceBucket = { age: 'unspecified', stance: 'unspecified', region: 'unspecified' };
+const unspecifiedBucket: PreferenceBucket = { age: 'unspecified', stance: 'unspecified', region: 'unspecified', gender: 'unspecified' };
 
 function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
   return {

@@ -31,7 +31,7 @@ export interface CachedExplanationLookup {
 const MAX_AGE_MS = CACHE_CONFIG.EXPLANATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
 function bucketCacheSegment(bucket: PreferenceBucket): string {
-  return simpleHash(`${bucket.age}|${bucket.stance}|${bucket.region}`).toString();
+  return simpleHash(`${bucket.age}|${bucket.stance}|${bucket.region}|${bucket.gender}`).toString();
 }
 
 export class CacheService {

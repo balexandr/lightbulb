@@ -161,6 +161,46 @@ describe('POST /api/illuminate', () => {
     expect(relevanceCallArgs.messages[0].content).toContain('progressive');
   });
 
+  it('passes gender into the relevance prompt when set', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: relevance });
+
+    await POST(
+      makeRequest({
+        item: makeItem(),
+        bucket: { age: 'unspecified', stance: 'unspecified', region: 'unspecified', gender: 'woman' },
+      })
+    );
+
+    const relevanceCallArgs = mockParse.mock.calls[1][0];
+    expect(relevanceCallArgs.messages[0].content).toContain('woman');
+  });
+
+  it('does not share a relevance cache entry across different genders for the same article', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    const item = makeItem();
+    const baseBucket = { age: 'unspecified', stance: 'unspecified', region: 'unspecified' };
+
+    mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: relevance });
+    await POST(makeRequest({ item, bucket: { ...baseBucket, gender: 'woman' } }));
+
+    mockParse.mockResolvedValueOnce({ parsed_output: relevance });
+    await POST(
+      makeRequest({
+        item,
+        bucket: { ...baseBucket, gender: 'man' },
+        needFact: false,
+        needRelevance: true,
+        factSummary: fact.summary,
+      })
+    );
+
+    // 2 calls for the first request (fact + relevance) + 1 more for the
+    // second request's relevance - a shared cache entry across genders
+    // would have meant only 2 calls total.
+    expect(mockParse).toHaveBeenCalledTimes(3);
+  });
+
   it('never sends bucket/preference data in the fact-layer prompt', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
     mockParse.mockResolvedValueOnce({ parsed_output: fact }).mockResolvedValueOnce({ parsed_output: relevance });

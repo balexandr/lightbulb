@@ -2,7 +2,7 @@ import { computeRelevanceTeaser } from './relevanceTeaser';
 import { PreferenceBucket } from '@/services/preferencesService';
 import { NewsItem } from '@/types/news';
 
-const unspecifiedBucket: PreferenceBucket = { age: 'unspecified', stance: 'unspecified', region: 'unspecified' };
+const unspecifiedBucket: PreferenceBucket = { age: 'unspecified', stance: 'unspecified', region: 'unspecified', gender: 'unspecified' };
 
 function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
   return {
@@ -94,7 +94,7 @@ describe('computeRelevanceTeaser', () => {
 
     it('never uses political stance as a signal', () => {
       const item = makeItem({ title: 'Immigration policy debate intensifies in Congress' });
-      const bucket: PreferenceBucket = { age: 'unspecified', stance: 'progressive', region: 'unspecified' };
+      const bucket: PreferenceBucket = { age: 'unspecified', stance: 'progressive', region: 'unspecified', gender: 'unspecified' };
 
       expect(computeRelevanceTeaser(item, bucket)).toBeNull();
     });
@@ -105,7 +105,7 @@ describe('computeRelevanceTeaser', () => {
       title: 'Local retirement community faces zoning dispute',
       source: { name: 'WHYY', type: 'rss' },
     });
-    const bucket: PreferenceBucket = { age: '65+', stance: 'unspecified', region: 'philadelphia' };
+    const bucket: PreferenceBucket = { age: '65+', stance: 'unspecified', region: 'philadelphia', gender: 'unspecified' };
 
     expect(computeRelevanceTeaser(item, bucket)).toEqual({ label: 'Philadelphia', reason: 'region' });
   });

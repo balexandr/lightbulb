@@ -106,6 +106,54 @@ describe('ExploreScreen', () => {
     );
   });
 
+  it('saves a gender selection', async () => {
+    render(<ExploreScreen />);
+    await waitFor(() => expect(mockPreferencesService.getPreferences).toHaveBeenCalled());
+
+    fireEvent.press(screen.getByText('Non-binary'));
+
+    await waitFor(() =>
+      expect(mockPreferencesService.savePreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ gender: 'non-binary' })
+      )
+    );
+  });
+
+  it('deselects a gender when tapped again', async () => {
+    mockPreferencesService.getPreferences.mockResolvedValue({ gender: 'woman' });
+    render(<ExploreScreen />);
+    await waitFor(() => expect(mockPreferencesService.getPreferences).toHaveBeenCalled());
+
+    fireEvent.press(screen.getByText('Woman'));
+
+    await waitFor(() =>
+      expect(mockPreferencesService.savePreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ gender: undefined })
+      )
+    );
+  });
+
+  it('clears gender when "Prefer not to say" is tapped, regardless of current selection', async () => {
+    mockPreferencesService.getPreferences.mockResolvedValue({ gender: 'man' });
+    render(<ExploreScreen />);
+    await waitFor(() => expect(mockPreferencesService.getPreferences).toHaveBeenCalled());
+
+    fireEvent.press(screen.getByText('Prefer not to say'));
+
+    await waitFor(() =>
+      expect(mockPreferencesService.savePreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ gender: undefined })
+      )
+    );
+  });
+
+  it('shows the data-use reassurance notice', async () => {
+    render(<ExploreScreen />);
+    await waitFor(() => expect(mockPreferencesService.getPreferences).toHaveBeenCalled());
+
+    expect(screen.getByText(/Nothing below is ever sold or shared/)).toBeTruthy();
+  });
+
   describe('"read across the aisle" count (§17.7)', () => {
     it('does not show the count when no political standpoint is set', async () => {
       render(<ExploreScreen />);

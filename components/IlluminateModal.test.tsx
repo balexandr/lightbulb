@@ -106,7 +106,7 @@ describe('IlluminateModal', () => {
           visible
           title="A headline"
           explanation={explanation}
-          bucket={{ age: '25-34', stance: 'progressive', region: 'unspecified' }}
+          bucket={{ age: '25-34', stance: 'progressive', region: 'unspecified', gender: 'unspecified' }}
           onClose={jest.fn()}
         />
       );
@@ -120,7 +120,7 @@ describe('IlluminateModal', () => {
           visible
           title="A headline"
           explanation={explanation}
-          bucket={{ age: 'unspecified', stance: 'unspecified', region: 'unspecified' }}
+          bucket={{ age: 'unspecified', stance: 'unspecified', region: 'unspecified', gender: 'unspecified' }}
           onClose={jest.fn()}
         />
       );
@@ -128,6 +128,20 @@ describe('IlluminateModal', () => {
       expect(
         screen.getByText('Shown because: no preferences are set, so this is a general, audience-agnostic explanation.')
       ).toBeTruthy();
+    });
+
+    it('names gender alongside the other bucket values when set', () => {
+      render(
+        <IlluminateModal
+          visible
+          title="A headline"
+          explanation={explanation}
+          bucket={{ age: 'unspecified', stance: 'unspecified', region: 'unspecified', gender: 'woman' }}
+          onClose={jest.fn()}
+        />
+      );
+
+      expect(screen.getByText('Shown because: woman.')).toBeTruthy();
     });
 
     it('always shows the data-sent disclosure, regardless of bucket', () => {

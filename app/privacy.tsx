@@ -23,28 +23,37 @@ export default function PrivacyPolicyScreen() {
         <ThemedText type="subtitle" style={styles.heading}>Information you provide</ThemedText>
         <ThemedText style={styles.paragraph}>
           In the app&apos;s Preferences screen, you may optionally set an age range (a broad
-          bracket, not your exact age) and a political leaning (a broad category, not a detailed
-          political profile). Both are stored only on your device, never on a server or account we
-          control. You can change or clear them anytime in Preferences.
+          bracket, not your exact age), a political leaning (a broad category, not a detailed
+          political profile), a gender (Woman, Man, or Non-binary, with an explicit &quot;Prefer
+          not to say&quot; choice), and a location (a broad region, not your exact city or
+          device location). All of these are stored only on your device, never on a server or
+          account we control. You can change or clear any of them anytime in Preferences.
         </ThemedText>
         <ThemedText style={styles.paragraph}>
-          We do not currently collect your name, email address, exact age, gender, or precise
-          location.
+          We do not currently collect your name, email address, exact age, or precise location.
         </ThemedText>
 
         <ThemedText type="subtitle" style={styles.heading}>The &quot;Illuminate&quot; AI feature</ThemedText>
         <ThemedText style={styles.paragraph}>
           When you tap Illuminate on an article, we send the headline, source name, and domain —
-          plus your bucketed age range and political leaning if you&apos;ve set them — to our AI
-          provider, Anthropic, to generate an explanation. We never send the full article text,
-          your exact age, name, or location. Anthropic acts as a data processor for this feature.
+          plus your bucketed age range, political leaning, gender, and region if you&apos;ve set
+          them — to our AI provider, Anthropic, to generate an explanation. We never send the
+          full article text, your exact age, name, or precise location. Anthropic acts as a data
+          processor for this feature.
         </ThemedText>
         <ThemedText style={styles.paragraph}>
           To keep the app fast and affordable, we cache generated explanations on our own server
           infrastructure (currently Upstash). The cache is keyed by the article and, for the
-          personalized portion, by your bucketed preferences — never by anything tied to you or
-          your device. If our AI provider is unavailable, the app falls back to a generic,
-          on-device canned explanation.
+          personalized portion, by your bucketed age range, political leaning, gender, and region
+          — never by anything tied to you or your device. If our AI provider is unavailable, the
+          app falls back to a generic, on-device canned explanation.
+        </ThemedText>
+        <ThemedText style={styles.paragraph}>
+          Political opinion is treated as sensitive data in some jurisdictions (GDPR
+          &quot;special category data,&quot; CCPA/CPRA &quot;sensitive personal
+          information&quot;) — setting it is entirely optional. Gender is not on either of
+          those lists, but we still treat it with the same care: optional, device-local, and
+          bucketed.
         </ThemedText>
 
         <ThemedText type="subtitle" style={styles.heading}>News sources</ThemedText>

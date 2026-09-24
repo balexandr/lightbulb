@@ -27,7 +27,7 @@ under Apple's actual definitions before you rely on it.
 | Contact Info (name, email, phone, address) | No | — | No account, no forms collecting this |
 | Health & Fitness | No | — | |
 | Financial Info | No | — | No payments, no IAP |
-| Location (precise or coarse) | No | — | Not requested or collected |
+| Location (precise or coarse) | ⚠️ Yes (coarse only) | Likely "Not Linked to You" | §17.4: user-set broad region (e.g. "northeast," "philadelphia"), never city/zip/device GPS. Same path as age range below - bucketed, device-local by default, sent per-request to Anthropic and transiently in our cache key. Confirm whether Apple's "Location" category is meant for this coarse, self-reported case or only device-sensor location before relying on this row. |
 | **Sensitive Info — Political opinion** | ⚠️ Yes | Likely "Not Linked to You" | User-set, device-local by default; bucketed value is sent to Anthropic per-request and transiently appears in our Redis cache key (see PRIVACY_POLICY.md "Caching") — but never tied to a user/device identifier anywhere in that path. This is the highest-scrutiny row; get real legal/App-Review-experienced eyes on it before submitting. |
 | Contacts (address book) | No | — | Not accessed |
 | User Content (photos, videos, messages, etc.) | No | — | No user-generated content in the app |
@@ -38,6 +38,7 @@ under Apple's actual definitions before you rely on it.
 | Usage Data (product interaction, ad data) | No | — | No analytics SDK integrated as of this writing |
 | Diagnostics (crash/performance data) | No | — | No crash reporting SDK integrated as of this writing |
 | **Other Data — Age range** | ⚠️ Yes | Likely "Not Linked to You" | Same path as political opinion: bucketed (e.g. "25-34"), device-local by default, sent per-request to Anthropic and transiently in our cache key. Not Apple's typical "Sensitive Info" bucket, but still real data leaving the device — probably belongs under "Other Data," confirm the exact sub-type when filling out App Store Connect. |
+| **Other Data — Gender** | ⚠️ Yes | Likely "Not Linked to You" | Same path as age range: bucketed (Woman/Man/Non-binary), device-local by default, optional with an explicit "Prefer not to say," sent per-request to Anthropic and transiently in our cache key. Unlike political opinion, gender is not GDPR special-category or CPRA sensitive-PI data as such (see PRIVACY_POLICY.md) - but Apple's own privacy-label taxonomy may still have a specific place for it (check "Contact Info" vs "Other Data" in the live questionnaire, don't assume it maps the same way as age range). |
 
 ## If/when this changes
 
@@ -48,6 +49,8 @@ Update this worksheet (and the actual App Store Connect declaration)
   You" depending on the SDK)
 - Analytics or crash reporting (adds Usage Data / Diagnostics)
 - Accounts or sign-in (adds Contact Info, and likely upgrades the
-  political-opinion/age rows from "Not Linked to You" to "Linked to
-  You," since they'd now be tied to an identity)
-- Location collection (adds Location)
+  political-opinion/age/gender/location rows from "Not Linked to You" to
+  "Linked to You," since they'd now be tied to an identity)
+- Precise (device-sensor) location collection - coarse, self-reported
+  region is already covered above; this is about adding GPS/precise
+  location on top of that, a materially different privacy posture

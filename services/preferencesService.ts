@@ -5,9 +5,18 @@ import { logger } from '@/utils/logger';
 
 export type AgeRange = '18-24' | '25-34' | '35-44' | '45-54' | '55-64' | '65+';
 
+// Kept as a small fixed set, same reasoning as political stance/age (§14.3)
+// - and deliberately not free text, so it can only ever widen the "why
+// this matters to you" framing (§14.5), never become a place for a reader
+// to write in anything unbounded. "Prefer not to say" isn't its own stored
+// value - it maps to leaving this field unset, same pattern as every other
+// preference here (see the UI's toggle-off behavior in explore.tsx).
+export type GenderIdentity = 'woman' | 'man' | 'non-binary';
+
 export interface UserPreferences {
   politicalStandpoint?: 'progressive' | 'liberal' | 'moderate' | 'conservative' | 'libertarian';
   ageRange?: AgeRange;
+  gender?: GenderIdentity;
   // A coarse region, not a precise location - never city/zip (§12.4). §17.4
   // is the first consumer (surfacing a "Local News" section for
   // 'philadelphia'), but any region-tailored feature can read this.
@@ -19,11 +28,13 @@ export interface UserPreferences {
 export type AgeBucket = AgeRange | 'unspecified';
 export type StanceBucket = NonNullable<UserPreferences['politicalStandpoint']> | 'unspecified';
 export type RegionBucket = Region | 'unspecified';
+export type GenderBucket = GenderIdentity | 'unspecified';
 
 export interface PreferenceBucket {
   age: AgeBucket;
   stance: StanceBucket;
   region: RegionBucket;
+  gender: GenderBucket;
 }
 
 const PREFERENCES_KEY = '@lightbulb_user_preferences';
@@ -77,6 +88,7 @@ class PreferencesService {
       age: preferences.ageRange ?? 'unspecified',
       stance: preferences.politicalStandpoint ?? 'unspecified',
       region: preferences.location ?? 'unspecified',
+      gender: preferences.gender ?? 'unspecified',
     };
   }
 }

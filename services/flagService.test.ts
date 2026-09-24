@@ -1,7 +1,7 @@
 import { flagService } from './flagService';
 import { PreferenceBucket } from './preferencesService';
 
-const bucket: PreferenceBucket = { age: 'unspecified', stance: 'unspecified', region: 'unspecified' };
+const bucket: PreferenceBucket = { age: 'unspecified', stance: 'unspecified', region: 'unspecified', gender: 'unspecified' };
 
 describe('FlagService.submitFlag', () => {
   beforeEach(() => {

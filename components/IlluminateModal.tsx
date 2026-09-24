@@ -36,6 +36,7 @@ function describeBucket(bucket: PreferenceBucket): string {
   if (bucket.age !== 'unspecified') parts.push(`age ${bucket.age}`);
   if (bucket.stance !== 'unspecified') parts.push(`${bucket.stance}-leaning`);
   if (bucket.region !== 'unspecified') parts.push(bucket.region);
+  if (bucket.gender !== 'unspecified') parts.push(bucket.gender);
 
   if (parts.length === 0) {
     return 'Shown because: no preferences are set, so this is a general, audience-agnostic explanation.';

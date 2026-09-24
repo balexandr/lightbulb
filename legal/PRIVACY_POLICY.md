@@ -26,19 +26,34 @@ In the app's Preferences screen, you may optionally set:
 - **Age range** (a broad bracket, e.g. "25-34" — not your exact age)
 - **Political leaning** (a broad category, e.g. "progressive," "moderate,"
   "conservative" — not a detailed political profile)
+- **Gender** (Woman, Man, or Non-binary — entirely optional, with an
+  explicit "Prefer not to say" choice that behaves the same as never
+  setting it)
+- **Location** (a broad region, e.g. "Northeast" or "Philadelphia" — not
+  your exact city, zip code, or device location)
 
-Both are stored **only on your device** (local app storage), not on any
-server or account we control. You can change or clear them at any time in
-Preferences, and clearing them deletes them from your device.
+All of these are stored **only on your device** (local app storage), not
+on any server or account we control. You can change or clear any of them
+at any time in Preferences, and clearing them deletes them from your
+device.
 
-We do not currently collect your name, email address, exact age, gender,
-or precise location, and nothing in the app's Preferences screen asks for
+We do not currently collect your name, email address, exact age, or
+precise location, and nothing in the app's Preferences screen asks for
 them.
 
 **Political opinion is treated as sensitive data in some jurisdictions**
 (e.g. "special category data" under GDPR Article 9, "sensitive personal
 information" under CCPA/CPRA). Setting a political-leaning preference is
 entirely optional, and the app functions fully without it.
+
+**Gender, by contrast, is not on either of those lists** — GDPR Article 9
+covers data about sex life or sexual orientation, and CPRA's sensitive-PI
+list doesn't include gender or political affiliation at all. We're still
+treating it with the same care (optional, device-local, bucketed, never
+required) since it's still personal data, just not one that triggers the
+heavier special-category consent requirements political opinion does.
+[Not legal advice — verify this characterization if it matters for your
+jurisdiction.]
 
 ## The "Illuminate" AI feature
 
@@ -47,8 +62,9 @@ our AI provider, **Anthropic** (maker of Claude), to generate an
 explanation:
 
 - The article's headline, source name, and domain (e.g. "bbc.com")
-- If you've set them: your bucketed age range and political leaning
-  (e.g. "25-34," "progressive") — never your exact age, name, or location
+- If you've set them: your bucketed age range, political leaning, gender,
+  and region (e.g. "25-34," "progressive," "woman," "northeast") — never
+  your exact age, name, or precise location
 
 We never send the full article text, only the headline and source
 metadata above.
@@ -63,11 +79,11 @@ To avoid generating the same explanation repeatedly and to keep the app
 fast and affordable to run, we cache AI-generated explanations on our own
 server infrastructure, currently hosted via **Upstash** (a Redis
 database provider). This cache is keyed by the article and, for the
-personalized portion of the explanation, by your *bucketed* age range and
-political leaning (e.g. a cache key might look like
-`article-x::25-34::progressive`) — never by any identifier tied to you or
-your device. Upstash cannot connect a cached entry back to any individual
-user.
+personalized portion of the explanation, by your *bucketed* age range,
+political leaning, gender, and region (e.g. a cache key might look like
+`article-x::25-34::progressive::woman::northeast`) — never by any
+identifier tied to you or your device. Upstash cannot connect a cached
+entry back to any individual user.
 
 This means a bucketed category value (like "progressive") can
 transiently exist in our cache infrastructure, associated only with an

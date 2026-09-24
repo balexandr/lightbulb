@@ -22,7 +22,7 @@ function makeItem(overrides: Partial<NewsItem> = {}): NewsItem {
   };
 }
 
-const bucket: PreferenceBucket = { age: 'unspecified', stance: 'unspecified', region: 'unspecified' };
+const bucket: PreferenceBucket = { age: 'unspecified', stance: 'unspecified', region: 'unspecified', gender: 'unspecified' };
 
 describe('BriefingService.getScript', () => {
   beforeEach(() => {

@@ -8,7 +8,7 @@ import { Region } from '@/constants/newsConfig';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { crossLeanService } from '@/services/crossLeanService';
-import { AgeRange, preferencesService, UserPreferences } from '@/services/preferencesService';
+import { AgeRange, GenderIdentity, preferencesService, UserPreferences } from '@/services/preferencesService';
 
 type PoliticalStandpoint = NonNullable<UserPreferences['politicalStandpoint']>;
 
@@ -54,6 +54,24 @@ export default function ExploreScreen() {
     await preferencesService.savePreferences(newPrefs);
   };
 
+  const handleGenderChange = async (gender: GenderIdentity) => {
+    const newPrefs = {
+      ...preferences,
+      gender: preferences.gender === gender ? undefined : gender,
+    };
+    setPreferences(newPrefs);
+    await preferencesService.savePreferences(newPrefs);
+  };
+
+  // "Prefer not to say" isn't a stored value of its own (see
+  // preferencesService.ts) - it just clears the field, same end state as
+  // never having set it. Always tappable, never shown as "selected."
+  const handleClearGender = async () => {
+    const newPrefs = { ...preferences, gender: undefined };
+    setPreferences(newPrefs);
+    await preferencesService.savePreferences(newPrefs);
+  };
+
   const politicalOptions: { value: PoliticalStandpoint; label: string; description: string }[] = [
     {
       value: 'progressive',
@@ -84,6 +102,12 @@ export default function ExploreScreen() {
 
   const ageRangeOptions: AgeRange[] = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
 
+  const genderOptions: { value: GenderIdentity; label: string }[] = [
+    { value: 'woman', label: 'Woman' },
+    { value: 'man', label: 'Man' },
+    { value: 'non-binary', label: 'Non-binary' },
+  ];
+
   const locationOptions: { value: Region; label: string }[] = [
     { value: 'philadelphia', label: 'Philadelphia, PA' },
     { value: 'northeast', label: 'Northeast (other)' },
@@ -101,6 +125,17 @@ export default function ExploreScreen() {
           <ThemedText style={styles.subtitle}>
             Personalize how news impacts are explained to you
           </ThemedText>
+        </ThemedView>
+
+        <ThemedView style={styles.section}>
+          <ThemedView style={styles.dataUseBox}>
+            <ThemedText style={styles.dataUseText}>
+              🔒 Nothing below is ever sold or shared with advertisers. These preferences stay
+              on this device, and only a broad, bucketed version (never your exact answers) is
+              sent to our AI provider when you request a summary — used for that one purpose,
+              nothing else. See the Privacy Policy in the Legal section below for details.
+            </ThemedText>
+          </ThemedView>
         </ThemedView>
 
         <ThemedView style={styles.section}>
@@ -213,6 +248,62 @@ export default function ExploreScreen() {
                 </TouchableOpacity>
               );
             })}
+          </View>
+        </ThemedView>
+
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Gender
+          </ThemedText>
+          <ThemedText style={styles.sectionDescription}>
+            Optional - helps tailor relevance for stories where it matters. Never assumed if
+            left blank.
+          </ThemedText>
+
+          <View style={styles.ageRangeContainer}>
+            {genderOptions.map((option) => {
+              const isSelected = preferences.gender === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.ageRangeButton,
+                    {
+                      backgroundColor: isSelected
+                        ? Colors[colorScheme].tint
+                        : colorScheme === 'dark'
+                        ? '#2C2C2E'
+                        : '#F2F2F7',
+                      borderColor: isSelected ? Colors[colorScheme].tint : 'transparent',
+                    },
+                  ]}
+                  onPress={() => handleGenderChange(option.value)}
+                >
+                  <Text
+                    style={[
+                      styles.ageRangeText,
+                      { color: isSelected ? '#000000' : Colors[colorScheme].text },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={[
+                styles.ageRangeButton,
+                {
+                  backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F2F2F7',
+                  borderColor: 'transparent',
+                },
+              ]}
+              onPress={handleClearGender}
+            >
+              <Text style={[styles.ageRangeText, { color: Colors[colorScheme].text }]}>
+                Prefer not to say
+              </Text>
+            </TouchableOpacity>
           </View>
         </ThemedView>
 
@@ -350,6 +441,16 @@ const styles = StyleSheet.create({
   ageRangeText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  dataUseBox: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(52, 199, 89, 0.1)',
+  },
+  dataUseText: {
+    fontSize: 13,
+    lineHeight: 20,
+    opacity: 0.9,
   },
   infoBox: {
     marginTop: 16,

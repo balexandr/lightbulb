@@ -34,7 +34,7 @@ const BriefingScriptSchema = z.object({
 // layer (docs/TECHNICAL_GUIDE.md §14.5) - a briefing script is just the
 // relevance layer read aloud for several stories at once, so it inherits
 // the same hard rule, not a lighter version of it.
-const BRIEFING_SYSTEM_PROMPT = `You are writing a short spoken morning news briefing script, meant to be read aloud by a text-to-speech engine - not displayed as text. Given a list of headlines (each with a source and, where available, a one-line factual summary) and an optional reader context (broad age range and general political leaning), write a single flowing ~90-second script (roughly 200-230 words) that briefly covers every story in order.
+const BRIEFING_SYSTEM_PROMPT = `You are writing a short spoken morning news briefing script, meant to be read aloud by a text-to-speech engine - not displayed as text. Given a list of headlines (each with a source and, where available, a one-line factual summary) and an optional reader context (broad age range, general political leaning, and gender), write a single flowing ~90-second script (roughly 200-230 words) that briefly covers every story in order.
 
 Rules:
 - State facts once, consistently - never spin or omit facts based on the reader's context.
@@ -68,7 +68,7 @@ function scriptCacheKey(items: BriefingRequestItem[], bucket: PreferenceBucket):
   // bounds Redis key length regardless of how many stories/how long their
   // headlines are.
   const storySetHash = simpleHash(articleKeys.join('|'));
-  return `${storySetHash}::${bucket.age}::${bucket.stance}::${bucket.region}`;
+  return `${storySetHash}::${bucket.age}::${bucket.stance}::${bucket.region}::${bucket.gender}`;
 }
 
 function anthropicErrorResponse(error: unknown): Response {
@@ -113,7 +113,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: `items is limited to ${MAX_ITEMS} stories per briefing.` }, { status: 400 });
   }
 
-  const bucket: PreferenceBucket = body.bucket ?? { age: 'unspecified', stance: 'unspecified', region: 'unspecified' };
+  const bucket: PreferenceBucket = body.bucket ?? { age: 'unspecified', stance: 'unspecified', region: 'unspecified', gender: 'unspecified' };
   const cacheKey = scriptCacheKey(items, bucket);
 
   const cached = await scriptCache.get(cacheKey);
@@ -135,6 +135,7 @@ export async function POST(request: Request): Promise<Response> {
   if (bucket.age !== 'unspecified') bucketLines.push(`age range: ${bucket.age}`);
   if (bucket.stance !== 'unspecified') bucketLines.push(`general political leaning: ${bucket.stance}`);
   if (bucket.region !== 'unspecified') bucketLines.push(`region: ${bucket.region}`);
+  if (bucket.gender !== 'unspecified') bucketLines.push(`gender: ${bucket.gender}`);
   const readerContext = bucketLines.length > 0
     ? `Reader context: ${bucketLines.join(', ')}.`
     : `Reader context: unspecified.`;

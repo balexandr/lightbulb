@@ -105,6 +105,35 @@ describe('POST /api/briefing', () => {
     expect(mockParse).toHaveBeenCalledTimes(1);
   });
 
+  it('does not share a cached script across different genders for the same stories', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValue({ parsed_output: { script: 'A script.' } });
+    // Same items array reused for both requests - only gender should
+    // differ, so any extra Claude call has to be gender's doing.
+    const items = [makeItem()];
+    const baseBucket = { age: 'unspecified' as const, stance: 'unspecified' as const, region: 'unspecified' as const };
+
+    await POST(makeRequest({ items, bucket: { ...baseBucket, gender: 'woman' as const } }));
+    await POST(makeRequest({ items, bucket: { ...baseBucket, gender: 'man' as const } }));
+
+    expect(mockParse).toHaveBeenCalledTimes(2);
+  });
+
+  it('passes gender into the briefing prompt when set', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    mockParse.mockResolvedValue({ parsed_output: { script: 'A script.' } });
+
+    await POST(
+      makeRequest({
+        items: [makeItem()],
+        bucket: { age: 'unspecified' as const, stance: 'unspecified' as const, region: 'unspecified' as const, gender: 'non-binary' as const },
+      })
+    );
+
+    const [[callArgs]] = mockParse.mock.calls;
+    expect(callArgs.messages[0].content).toContain('non-binary');
+  });
+
   it('includes the persuasion guardrail in the system prompt', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
     mockParse.mockResolvedValue({ parsed_output: { script: 'A script.' } });
