@@ -8,7 +8,6 @@ export type AgeRange = '18-24' | '25-34' | '35-44' | '45-54' | '55-64' | '65+';
 export interface UserPreferences {
   politicalStandpoint?: 'progressive' | 'liberal' | 'moderate' | 'conservative' | 'libertarian';
   ageRange?: AgeRange;
-  gender?: string;
   // A coarse region, not a precise location - never city/zip (§12.4). §17.4
   // is the first consumer (surfacing a "Local News" section for
   // 'philadelphia'), but any region-tailored feature can read this.

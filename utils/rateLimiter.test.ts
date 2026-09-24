@@ -35,4 +35,20 @@ describe('RateLimiter', () => {
     expect(limiter.check('a', 30_000).limited).toBe(true);
     expect(limiter.check('a', 60_000).limited).toBe(false);
   });
+
+  it('caps the number of tracked clients instead of growing unbounded', () => {
+    // Simulates a client cycling a fresh fake key on every request (e.g. a
+    // spoofed X-Forwarded-For value) to dodge the per-key limit - the
+    // limiter itself must still stay bounded in memory.
+    const limiter = new RateLimiter(1, 60_000, 3);
+
+    for (let i = 0; i < 1000; i++) {
+      limiter.check(`fake-client-${i}`, 0);
+    }
+
+    // Only the most recent maxTrackedClients keys survive; older ones were
+    // evicted and so are treated as fresh (unlimited) again.
+    expect(limiter.check('fake-client-999', 1).limited).toBe(true);
+    expect(limiter.check('fake-client-0', 1).limited).toBe(false);
+  });
 });

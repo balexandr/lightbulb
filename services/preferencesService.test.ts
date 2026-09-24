@@ -61,14 +61,6 @@ describe('getPreferenceBucket', () => {
     });
   });
 
-  it('ignores gender - not part of the bucket', () => {
-    expect(preferencesService.getPreferenceBucket({ gender: 'nonbinary' })).toEqual({
-      age: 'unspecified',
-      stance: 'unspecified',
-      region: 'unspecified',
-    });
-  });
-
   it('passes location through as the region bucket (§17.4)', () => {
     expect(preferencesService.getPreferenceBucket({ location: 'philadelphia' })).toEqual({
       age: 'unspecified',

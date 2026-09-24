@@ -1,4 +1,5 @@
 import { REDDIT_SUBREDDITS, RSS_FEEDS, TRUSTED_NEWS_DOMAINS } from '@/constants/newsConfig';
+import { getClientIp } from '@/utils/clientIp';
 import { RateLimiter } from '@/utils/rateLimiter';
 
 // The web build can't fetch RSS/Reddit feeds (or scrape article pages for
@@ -25,14 +26,6 @@ const ALLOWED_URLS = new Set<string>([
 ]);
 
 const UPSTREAM_TIMEOUT_MS = 10000;
-
-function getClientIp(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-  return 'unknown';
-}
 
 function isAllowedTrustedDomain(url: URL): boolean {
   if (url.protocol !== 'https:') return false;

@@ -118,7 +118,7 @@ describe('AIService.explainNews', () => {
     expect(mockCacheService.setRelevance).toHaveBeenCalledWith(item, unspecifiedBucket, relevance);
   });
 
-  it('falls back to a mock explanation when the request fails', async () => {
+  it('falls back to a mock explanation when the request fails, without caching it', async () => {
     mockCacheService.getExplanation.mockResolvedValue({ fact: null, relevance: null });
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: false,
@@ -130,11 +130,13 @@ describe('AIService.explainNews', () => {
     const result = await aiService.explainNews(item);
 
     expect(result.summary).toContain(item.title);
-    expect(mockCacheService.setFact).toHaveBeenCalledWith(item, { summary: result.summary, credibility: result.credibility });
-    expect(mockCacheService.setRelevance).toHaveBeenCalledWith(item, unspecifiedBucket, { why: result.why, impact: result.impact });
+    // A transient failure shouldn't poison the shared cache with
+    // placeholder boilerplate for every later reader of this article.
+    expect(mockCacheService.setFact).not.toHaveBeenCalled();
+    expect(mockCacheService.setRelevance).not.toHaveBeenCalled();
   });
 
-  it('falls back to a mock explanation when fetch itself throws (e.g. offline)', async () => {
+  it('falls back to a mock explanation when fetch itself throws (e.g. offline), without caching it', async () => {
     mockCacheService.getExplanation.mockResolvedValue({ fact: null, relevance: null });
     (global.fetch as jest.Mock).mockRejectedValue(new Error('Network request failed'));
 
@@ -142,6 +144,8 @@ describe('AIService.explainNews', () => {
     const result = await aiService.explainNews(item);
 
     expect(result.summary).toContain(item.title);
+    expect(mockCacheService.setFact).not.toHaveBeenCalled();
+    expect(mockCacheService.setRelevance).not.toHaveBeenCalled();
   });
 
   it('gives Reddit sources a Reddit-specific credibility note in the mock', async () => {

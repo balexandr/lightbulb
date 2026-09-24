@@ -1,4 +1,5 @@
 import { PreferenceBucket } from '@/services/preferencesService';
+import { getClientIp } from '@/utils/clientIp';
 import { RateLimiter } from '@/utils/rateLimiter';
 
 // Low-traffic, abuse-prone endpoint (no auth, free-form text) - a tighter
@@ -17,14 +18,6 @@ interface FlagRequestBody {
   bucket?: PreferenceBucket;
   flaggedField: FlagReason;
   freeText?: string;
-}
-
-function getClientIp(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-  return 'unknown';
 }
 
 export async function POST(request: Request): Promise<Response> {

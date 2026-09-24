@@ -69,11 +69,13 @@ class AIService {
       logger.success('Generated and cached new explanation');
       return { ...fact, ...relevance };
     } catch (error: any) {
+      // Deliberately not cached: this fires on any failure, including a
+      // transient one (a momentary 502, a dropped connection). Caching it
+      // would serve this placeholder boilerplate to every subsequent
+      // reader of this article/bucket for the cache's full TTL, silently,
+      // long after the real API recovered.
       logger.info('Falling back to mock explanation:', error.message);
-      const mockExplanation = this.getMockExplanation(item);
-      await cacheService.setFact(item, { summary: mockExplanation.summary, credibility: mockExplanation.credibility });
-      await cacheService.setRelevance(item, bucket, { why: mockExplanation.why, impact: mockExplanation.impact });
-      return mockExplanation;
+      return this.getMockExplanation(item);
     }
   }
 
