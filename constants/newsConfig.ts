@@ -33,6 +33,19 @@ export type LeanTag = 'left-leaning' | 'center' | 'right-leaning' | 'not-applica
 // extend this as more hyperlocal layers get built, not preemptively.
 export type Region = 'philadelphia' | 'northeast' | 'midwest' | 'south' | 'west' | 'outside-us';
 
+// Short display labels for compact UI (e.g. §17.1's "Relevant to you: X"
+// card badge). Deliberately separate from explore.tsx's own location-picker
+// labels ("Philadelphia, PA", "Northeast (other)") - those need to read
+// well as a list of choices, this needs to read well inline in a small tag.
+export const REGION_LABELS: Record<Region, string> = {
+  philadelphia: 'Philadelphia',
+  northeast: 'the Northeast',
+  midwest: 'the Midwest',
+  south: 'the South',
+  west: 'the West',
+  'outside-us': 'outside the U.S.',
+};
+
 export interface RSSFeedConfig {
   name: string;
   url: string;

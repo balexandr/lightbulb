@@ -329,6 +329,39 @@ describe('HomeScreen', () => {
     });
   });
 
+  describe('relevance teaser (§17.1)', () => {
+    it('shows a region teaser on a hyperlocal card matching the reader\'s region', async () => {
+      await preferencesService.savePreferences({ location: 'philadelphia' });
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ id: 'whyy-item', title: 'WHYY story', source: { name: 'WHYY', type: 'rss' }, url: 'https://example.com/whyy' }),
+      ]);
+
+      render(<HomeScreen />);
+
+      await waitFor(() => expect(screen.getByText('Relevant to you: Philadelphia')).toBeTruthy());
+    });
+
+    it('shows a topic teaser on a matching headline for the reader\'s age bucket', async () => {
+      await preferencesService.savePreferences({ ageRange: '65+' });
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ title: 'Social Security cost-of-living increase announced' }),
+      ]);
+
+      render(<HomeScreen />);
+
+      await waitFor(() => expect(screen.getByText('Relevant to you: retirement')).toBeTruthy());
+    });
+
+    it('shows no teaser when the reader has no matching preferences', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+
+      expect(screen.queryByText(/Relevant to you:/)).toBeNull();
+    });
+  });
+
   it('shows a coverage comparison pill only for articles with a clustered match, and opens the comparison modal', async () => {
     mockNewsService.fetchAllNews.mockResolvedValue([
       makeItem({

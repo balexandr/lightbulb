@@ -22,6 +22,7 @@ import { PreferenceBucket, preferencesService } from '@/services/preferencesServ
 import { AIExplanation, NewsItem } from '@/types/news';
 import { applyEngagementRanking } from '@/utils/engagementRanking';
 import { logger } from '@/utils/logger';
+import { computeRelevanceTeaser } from '@/utils/relevanceTeaser';
 import { buildRelatedArticlesIndex } from '@/utils/storyClustering';
 
 const BRIEFING_STORY_COUNT = 5;
@@ -39,7 +40,8 @@ export default function HomeScreen() {
   const [explanation, setExplanation] = useState<AIExplanation | null>(null);
   const [explanationBucket, setExplanationBucket] = useState<PreferenceBucket | null>(null);
   const [fromCache, setFromCache] = useState(false);
-  
+  const [readerBucket, setReaderBucket] = useState<PreferenceBucket | null>(null);
+
   const [rssSources, setRssSources] = useState<string[]>([]);
   const [redditSources, setRedditSources] = useState<string[]>([]);
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
@@ -153,6 +155,17 @@ export default function HomeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // §17.1: also mount-only, same tradeoff as §17.4's hyperlocal
+  // default-source selection above - if the reader changes preferences on
+  // the Settings tab and comes back, the on-card teaser won't reflect it
+  // until next app restart. Acceptable for a cheap rule-based hint;
+  // Illuminate itself (handleIlluminate) always re-reads fresh preferences.
+  useEffect(() => {
+    preferencesService.getPreferences().then(preferences => {
+      setReaderBucket(preferencesService.getPreferenceBucket(preferences));
+    });
+  }, []);
+
   const onRefresh = () => {
     setRefreshing(true);
     loadNews(true);
@@ -189,6 +202,22 @@ export default function HomeScreen() {
   const handleCloseComparison = () => {
     setComparisonVisible(false);
     setComparisonItem(null);
+  };
+
+  const renderRelevanceTeaser = (item: NewsItem) => {
+    if (!readerBucket) {
+      return null;
+    }
+    const teaser = computeRelevanceTeaser(item, readerBucket);
+    if (!teaser) {
+      return null;
+    }
+
+    return (
+      <View style={styles.teaserBadge}>
+        <Text style={styles.teaserText}>Relevant to you: {teaser.label}</Text>
+      </View>
+    );
   };
 
   const renderComparisonPill = (item: NewsItem) => {
@@ -383,6 +412,7 @@ export default function HomeScreen() {
                 {item.title}
               </ThemedText>
             </TouchableOpacity>
+            {renderRelevanceTeaser(item)}
             {item.imageUrl && (
               <TouchableOpacity onPress={() => handleOpenArticle(item)}>
                 <View style={styles.imageContainer}>
@@ -595,6 +625,19 @@ const styles = StyleSheet.create({
   },
   illuminateText: {
     fontSize: 12,
+    fontWeight: '600',
+    color: AccentColor,
+  },
+  teaserBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 193, 7, 0.15)',
+  },
+  teaserText: {
+    fontSize: 11,
     fontWeight: '600',
     color: AccentColor,
   },
