@@ -1,15 +1,11 @@
 import React from 'react';
 import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { OutletType, RSS_FEEDS, SourceTrustInfo } from '@/constants/newsConfig';
+import { OutletType, REGION_LABELS, RSS_FEEDS, SourceTrustInfo } from '@/constants/newsConfig';
 import { AccentColor, Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
-
-const REGION_LABELS: Record<string, string> = {
-  philadelphia: 'Philadelphia, PA',
-};
 
 const OUTLET_TYPE_LABELS: Record<OutletType, string> = {
   'public-broadcaster': 'Public broadcaster',

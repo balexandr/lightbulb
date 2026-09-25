@@ -82,7 +82,7 @@ describe('FilterMenu', () => {
       renderMenu({ rssSources: ['BBC', 'WHYY'] });
 
       expect(screen.getByText('📍 Local News')).toBeTruthy();
-      expect(screen.getByText('Philadelphia, PA')).toBeTruthy();
+      expect(screen.getByText('Philadelphia')).toBeTruthy();
       // WHYY appears once, under Local News, not duplicated under News Outlets.
       expect(screen.getAllByText('WHYY')).toHaveLength(1);
       expect(screen.getByText('BBC')).toBeTruthy();
@@ -91,6 +91,13 @@ describe('FilterMenu', () => {
     it('omits the Local News section when no local sources are present', () => {
       renderMenu({ rssSources: ['BBC', 'NPR'] });
       expect(screen.queryByText('📍 Local News')).toBeNull();
+    });
+
+    it('groups a source from a different hyperlocal city under its own region label', () => {
+      renderMenu({ rssSources: ['BBC', 'Gothamist'] });
+
+      expect(screen.getByText('📍 Local News')).toBeTruthy();
+      expect(screen.getByText('New York City')).toBeTruthy();
     });
 
     it('still toggles a local source like any other source', () => {

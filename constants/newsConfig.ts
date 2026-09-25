@@ -27,11 +27,25 @@ export interface SourceTrustInfo {
 export type LeanTag = 'left-leaning' | 'center' | 'right-leaning' | 'not-applicable';
 
 // §17.4: the small set of regions this app currently has (or buckets
-// preferences into) - not a full state list. "philadelphia" is its own
-// value rather than folded into "northeast" because it's the one region
-// with an actual hyperlocal source layer right now (see RSS_FEEDS below);
-// extend this as more hyperlocal layers get built, not preemptively.
-export type Region = 'philadelphia' | 'northeast' | 'midwest' | 'south' | 'west' | 'outside-us';
+// preferences into) - not a full state list. Each named city is its own
+// value rather than folded into its broad region because it has an actual
+// hyperlocal source layer (see RSS_FEEDS below); the broad regions
+// (northeast/midwest/south/west) are the fallback for readers outside all
+// of the named cities. Extend this as more hyperlocal layers get built,
+// not preemptively - each new city needs a real, fetched-and-verified RSS
+// source the same way these did (§11's own instruction), not a guess.
+export type Region =
+  | 'philadelphia'
+  | 'new-york'
+  | 'los-angeles'
+  | 'chicago'
+  | 'bay-area'
+  | 'washington-dc'
+  | 'northeast'
+  | 'midwest'
+  | 'south'
+  | 'west'
+  | 'outside-us';
 
 // Short display labels for compact UI (e.g. §17.1's "Relevant to you: X"
 // card badge). Deliberately separate from explore.tsx's own location-picker
@@ -39,6 +53,11 @@ export type Region = 'philadelphia' | 'northeast' | 'midwest' | 'south' | 'west'
 // well as a list of choices, this needs to read well inline in a small tag.
 export const REGION_LABELS: Record<Region, string> = {
   philadelphia: 'Philadelphia',
+  'new-york': 'New York City',
+  'los-angeles': 'Los Angeles',
+  chicago: 'Chicago',
+  'bay-area': 'the Bay Area',
+  'washington-dc': 'Washington, D.C.',
   northeast: 'the Northeast',
   midwest: 'the Midwest',
   south: 'the South',
@@ -173,6 +192,60 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     lean: 'center',
     localRegion: 'philadelphia',
   },
+  // More §17.4 hyperlocal layers, one real source per city so far - each
+  // fetched and confirmed live RSS 2.0 with real items as of 2026-09-25,
+  // not just found via search (§11's own instruction). Several obvious
+  // picks failed this check: LAist (laist.com) - the natural first choice
+  // for LA - has no working RSS endpoint at any guessed path, so LA
+  // Public Press was used instead; DCist is fully shut down (confirmed
+  // 404, not just slow); KQED's naive `kqed.org/feed` and `/rss` guesses
+  // also 404'd before the actual working `ww2.kqed.org/news/feed/` was
+  // found.
+  {
+    name: 'Gothamist',
+    url: 'https://gothamist.com/feed',
+    icon: 'https://gothamist.com/favicon.ico',
+    fallbackImage: 'https://gothamist.com/favicon.ico',
+    trust: { outletType: 'public-broadcaster', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'center',
+    localRegion: 'new-york',
+  },
+  {
+    name: 'LA Public Press',
+    url: 'https://lapublicpress.org/feed/',
+    icon: 'https://lapublicpress.org/favicon.ico',
+    fallbackImage: 'https://lapublicpress.org/favicon.ico',
+    trust: { outletType: 'digital-native', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'center',
+    localRegion: 'los-angeles',
+  },
+  {
+    name: 'Block Club Chicago',
+    url: 'https://blockclubchicago.org/feed/',
+    icon: 'https://blockclubchicago.org/favicon.ico',
+    fallbackImage: 'https://blockclubchicago.org/favicon.ico',
+    trust: { outletType: 'digital-native', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'center',
+    localRegion: 'chicago',
+  },
+  {
+    name: 'KQED',
+    url: 'https://ww2.kqed.org/news/feed/',
+    icon: 'https://www.kqed.org/favicon.ico',
+    fallbackImage: 'https://www.kqed.org/favicon.ico',
+    trust: { outletType: 'public-broadcaster', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'center',
+    localRegion: 'bay-area',
+  },
+  {
+    name: 'WTOP',
+    url: 'https://wtop.com/feed/',
+    icon: 'https://wtop.com/favicon.ico',
+    fallbackImage: 'https://wtop.com/favicon.ico',
+    trust: { outletType: 'digital-native', hasCorrectionsPolicy: true, bylineTransparency: true },
+    lean: 'center',
+    localRegion: 'washington-dc',
+  },
 ];
 
 // Whether Reddit fetching is enabled is a server-driven feature flag now
@@ -209,7 +282,12 @@ export const TRUSTED_NEWS_DOMAINS = [
   'wired.com',
   'engadget.com',
   'whyy.org',
-  'billypenn.com'
+  'billypenn.com',
+  'gothamist.com',
+  'lapublicpress.org',
+  'blockclubchicago.org',
+  'kqed.org',
+  'wtop.com'
 ] as const;
 
 export const CACHE_CONFIG = {

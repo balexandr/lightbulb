@@ -100,12 +100,14 @@ non-personalized canned explanation generated entirely on your device.
 
 Lightbulb aggregates headlines from public RSS feeds, currently: BBC,
 NPR, Ars Technica, TechCrunch, The Guardian, Al Jazeera, CBC, The New
-York Times, Wired, Engadget, Hacker News, WHYY, and Billy Penn (the
-latter two are hyperlocal Philadelphia-area sources, surfaced only for
-readers in that region). [Reddit support exists in the app's code but is
-disabled by default as of this writing — update this section if it's
-ever turned back on.] We link to the original publisher for every
-article; we don't republish full article text.
+York Times, Wired, Engadget, and Hacker News, plus these hyperlocal
+sources, each surfaced only for readers who set the matching region in
+Preferences: WHYY and Billy Penn (Philadelphia), Gothamist (New York
+City), LA Public Press (Los Angeles), Block Club Chicago (Chicago), KQED
+(Bay Area), and WTOP (Washington, D.C.). [Reddit support exists in the
+app's code but is disabled by default as of this writing — update this
+section if it's ever turned back on.] We link to the original publisher
+for every article; we don't republish full article text.
 
 On the web version of the app, RSS and article-image fetches are routed
 through our own server (`/api/rss-proxy`), not a third party, to work

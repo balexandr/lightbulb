@@ -327,6 +327,20 @@ describe('HomeScreen', () => {
 
       expect(screen.getByText('WHYY story')).toBeTruthy();
     });
+
+    it('generalizes to a different hyperlocal city, without cross-matching another city\'s source', async () => {
+      await preferencesService.savePreferences({ location: 'new-york' });
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ id: 'whyy-item', title: 'WHYY story', source: { name: 'WHYY', type: 'rss' }, url: 'https://example.com/whyy' }),
+        makeItem({ id: 'gothamist-item', title: 'Gothamist story', source: { name: 'Gothamist', type: 'rss' }, url: 'https://example.com/gothamist' }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('Gothamist story'));
+
+      // The NYC reader gets Gothamist by default, but not Philadelphia's WHYY.
+      expect(screen.queryByText('WHYY story')).toBeNull();
+    });
   });
 
   describe('relevance teaser (§17.1)', () => {

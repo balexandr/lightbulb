@@ -41,6 +41,20 @@ describe('computeRelevanceTeaser', () => {
       expect(computeRelevanceTeaser(item, bucket)).toBeNull();
     });
 
+    it('generalizes to other hyperlocal cities, not just Philadelphia', () => {
+      const item = makeItem({ source: { name: 'Gothamist', type: 'rss' } });
+      const bucket: PreferenceBucket = { ...unspecifiedBucket, region: 'new-york' };
+
+      expect(computeRelevanceTeaser(item, bucket)).toEqual({ label: 'New York City', reason: 'region' });
+    });
+
+    it('does not cross-match one hyperlocal city\'s source against a different city reader', () => {
+      const item = makeItem({ source: { name: 'Gothamist', type: 'rss' } });
+      const bucket: PreferenceBucket = { ...unspecifiedBucket, region: 'philadelphia' };
+
+      expect(computeRelevanceTeaser(item, bucket)).toBeNull();
+    });
+
     it('does not match a national source even when the reader has a region set', () => {
       const item = makeItem({ source: { name: 'BBC', type: 'rss' } });
       const bucket: PreferenceBucket = { ...unspecifiedBucket, region: 'philadelphia' };

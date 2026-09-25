@@ -110,10 +110,15 @@ export default function ExploreScreen() {
 
   const locationOptions: { value: Region; label: string }[] = [
     { value: 'philadelphia', label: 'Philadelphia, PA' },
+    { value: 'new-york', label: 'New York City' },
     { value: 'northeast', label: 'Northeast (other)' },
-    { value: 'midwest', label: 'Midwest' },
-    { value: 'south', label: 'South' },
-    { value: 'west', label: 'West' },
+    { value: 'chicago', label: 'Chicago' },
+    { value: 'midwest', label: 'Midwest (other)' },
+    { value: 'washington-dc', label: 'Washington, D.C.' },
+    { value: 'south', label: 'South (other)' },
+    { value: 'los-angeles', label: 'Los Angeles' },
+    { value: 'bay-area', label: 'Bay Area' },
+    { value: 'west', label: 'West (other)' },
     { value: 'outside-us', label: 'Outside the U.S.' },
   ];
 
@@ -313,7 +318,8 @@ export default function ExploreScreen() {
           </ThemedText>
           <ThemedText style={styles.sectionDescription}>
             A general region, not your exact location - used for relevance and, where available,
-            local news (currently just Philadelphia)
+            local news (currently Philadelphia, New York City, Chicago, Washington D.C., Los
+            Angeles, and the Bay Area)
           </ThemedText>
 
           <View style={styles.ageRangeContainer}>
