@@ -60,8 +60,8 @@ export default function PrivacyPolicyScreen() {
         <ThemedText style={styles.paragraph}>
           Lightbulb aggregates headlines from public RSS feeds and links to the original publisher
           for every article — we don&apos;t republish full article text. On web, RSS and
-          article-image fetches are routed through a third-party CORS proxy (api.allorigins.win),
-          which sees the URLs being fetched but none of your personal information.
+          article-image fetches are routed through our own server, not a third party — no outside
+          service sees which feeds or articles you&apos;re loading.
         </ThemedText>
 
         <ThemedText type="subtitle" style={styles.heading}>What we don&apos;t do</ThemedText>

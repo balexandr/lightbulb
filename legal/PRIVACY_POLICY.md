@@ -100,16 +100,20 @@ non-personalized canned explanation generated entirely on your device.
 
 Lightbulb aggregates headlines from public RSS feeds, currently: BBC,
 NPR, Ars Technica, TechCrunch, The Guardian, Al Jazeera, CBC, The New
-York Times, Wired, Engadget, and Hacker News. [Reddit support exists in
-the app's code but is disabled by default as of this writing — update
-this section if it's ever turned back on.] We link to the original
-publisher for every article; we don't republish full article text.
+York Times, Wired, Engadget, Hacker News, WHYY, and Billy Penn (the
+latter two are hyperlocal Philadelphia-area sources, surfaced only for
+readers in that region). [Reddit support exists in the app's code but is
+disabled by default as of this writing — update this section if it's
+ever turned back on.] We link to the original publisher for every
+article; we don't republish full article text.
 
 On the web version of the app, RSS and article-image fetches are routed
-through a third-party CORS proxy, **api.allorigins.win**, to work around
-browser cross-origin restrictions. This proxy sees the URLs being
-fetched (RSS feed URLs and article URLs) but not any of your personal
-information.
+through our own server (`/api/rss-proxy`), not a third party, to work
+around browser cross-origin restrictions. No outside service sees the
+URLs being fetched (RSS feed URLs and article URLs) — this used to go
+through a third-party proxy, api.allorigins.win, but that dependency was
+removed after it had a full outage that took every news source down at
+once.
 
 ## What we don't do
 
