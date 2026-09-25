@@ -1,6 +1,6 @@
 import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -8,6 +8,7 @@ import { Region } from '@/constants/newsConfig';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { crossLeanService } from '@/services/crossLeanService';
+import { notificationService } from '@/services/notificationService';
 import { AgeRange, GenderIdentity, preferencesService, UserPreferences } from '@/services/preferencesService';
 
 type PoliticalStandpoint = NonNullable<UserPreferences['politicalStandpoint']>;
@@ -15,16 +16,25 @@ type PoliticalStandpoint = NonNullable<UserPreferences['politicalStandpoint']>;
 export default function ExploreScreen() {
   const [preferences, setPreferences] = useState<UserPreferences>({});
   const [crossLeanCount, setCrossLeanCount] = useState(0);
+  const [dailyDigestEnabled, setDailyDigestEnabled] = useState(false);
+  const [digestPermissionDenied, setDigestPermissionDenied] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
 
   useEffect(() => {
     loadPreferences();
     crossLeanService.getMonthlyCount().then(setCrossLeanCount);
+    notificationService.isDailyDigestEnabled().then(setDailyDigestEnabled);
   }, []);
 
   const loadPreferences = async () => {
     const prefs = await preferencesService.getPreferences();
     setPreferences(prefs);
+  };
+
+  const handleDailyDigestToggle = async (value: boolean) => {
+    const outcome = await notificationService.setDailyDigestEnabled(value);
+    setDailyDigestEnabled(outcome === 'ok' && value);
+    setDigestPermissionDenied(outcome === 'permission-denied');
   };
 
   const handlePoliticalStandpointChange = async (standpoint: PoliticalStandpoint) => {
@@ -357,6 +367,36 @@ export default function ExploreScreen() {
 
         <ThemedView style={styles.section}>
           <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Daily Digest
+          </ThemedText>
+          <ThemedText style={styles.sectionDescription}>
+            A once-a-day reminder to open the app - scheduled entirely on this device, no
+            account or server involved.
+          </ThemedText>
+
+          {notificationService.isSupported() ? (
+            <View style={styles.toggleRow}>
+              <ThemedText style={styles.toggleLabel}>Remind me every morning</ThemedText>
+              <Switch value={dailyDigestEnabled} onValueChange={handleDailyDigestToggle} />
+            </View>
+          ) : (
+            <ThemedText style={styles.unavailableText}>
+              Not available on web - open the app on iOS or Android to enable this.
+            </ThemedText>
+          )}
+
+          {digestPermissionDenied && (
+            <ThemedView style={styles.infoBox}>
+              <ThemedText style={styles.infoText}>
+                Notifications are turned off for Lightbulb in your device settings. Enable them
+                there, then try again here.
+              </ThemedText>
+            </ThemedView>
+          )}
+        </ThemedView>
+
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
             Coming Soon
           </ThemedText>
           <ThemedText style={styles.comingSoonText}>
@@ -457,6 +497,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     opacity: 0.9,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  toggleLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  unavailableText: {
+    fontSize: 13,
+    opacity: 0.6,
+    fontStyle: 'italic',
   },
   infoBox: {
     marginTop: 16,

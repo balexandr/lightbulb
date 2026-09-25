@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { crossLeanService } from '@/services/crossLeanService';
+import { notificationService } from '@/services/notificationService';
 import { preferencesService } from '@/services/preferencesService';
 
 import ExploreScreen from '@/app/(tabs)/explore';
@@ -16,14 +17,26 @@ jest.mock('@/services/crossLeanService', () => ({
   crossLeanService: { getMonthlyCount: jest.fn() },
 }));
 
+jest.mock('@/services/notificationService', () => ({
+  notificationService: {
+    isSupported: jest.fn(),
+    isDailyDigestEnabled: jest.fn(),
+    setDailyDigestEnabled: jest.fn(),
+  },
+}));
+
 const mockPreferencesService = preferencesService as jest.Mocked<typeof preferencesService>;
 const mockCrossLeanService = crossLeanService as jest.Mocked<typeof crossLeanService>;
+const mockNotificationService = notificationService as jest.Mocked<typeof notificationService>;
 
 describe('ExploreScreen', () => {
   beforeEach(() => {
     mockPreferencesService.getPreferences.mockResolvedValue({});
     mockPreferencesService.savePreferences.mockResolvedValue();
     mockCrossLeanService.getMonthlyCount.mockResolvedValue(0);
+    mockNotificationService.isSupported.mockReturnValue(true);
+    mockNotificationService.isDailyDigestEnabled.mockResolvedValue(false);
+    mockNotificationService.setDailyDigestEnabled.mockResolvedValue('ok');
   });
 
   afterEach(() => {
@@ -152,6 +165,45 @@ describe('ExploreScreen', () => {
     await waitFor(() => expect(mockPreferencesService.getPreferences).toHaveBeenCalled());
 
     expect(screen.getByText(/Nothing below is ever sold or shared/)).toBeTruthy();
+  });
+
+  describe('daily digest notification (§16.3 #2)', () => {
+    it('reflects the currently saved enabled state on load', async () => {
+      mockNotificationService.isDailyDigestEnabled.mockResolvedValue(true);
+      render(<ExploreScreen />);
+
+      await waitFor(() => expect(mockNotificationService.isDailyDigestEnabled).toHaveBeenCalled());
+      expect(screen.getByRole('switch').props.value).toBe(true);
+    });
+
+    it('enables the digest when the toggle is switched on', async () => {
+      render(<ExploreScreen />);
+      await waitFor(() => expect(mockNotificationService.isDailyDigestEnabled).toHaveBeenCalled());
+
+      fireEvent(screen.getByRole('switch'), 'valueChange', true);
+
+      await waitFor(() => expect(mockNotificationService.setDailyDigestEnabled).toHaveBeenCalledWith(true));
+      expect(screen.getByRole('switch').props.value).toBe(true);
+    });
+
+    it('shows a notice and reverts the toggle when permission is denied', async () => {
+      mockNotificationService.setDailyDigestEnabled.mockResolvedValue('permission-denied');
+      render(<ExploreScreen />);
+      await waitFor(() => expect(mockNotificationService.isDailyDigestEnabled).toHaveBeenCalled());
+
+      fireEvent(screen.getByRole('switch'), 'valueChange', true);
+
+      await waitFor(() => expect(screen.getByText(/turned off for Lightbulb in your device settings/)).toBeTruthy());
+      expect(screen.getByRole('switch').props.value).toBe(false);
+    });
+
+    it('shows an unavailable message instead of a toggle when not supported (web)', async () => {
+      mockNotificationService.isSupported.mockReturnValue(false);
+      render(<ExploreScreen />);
+
+      await waitFor(() => expect(screen.getByText(/Not available on web/)).toBeTruthy());
+      expect(screen.queryByRole('switch')).toBeNull();
+    });
   });
 
   describe('"read across the aisle" count (§17.7)', () => {
