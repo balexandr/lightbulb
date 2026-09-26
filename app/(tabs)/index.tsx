@@ -383,14 +383,14 @@ export default function HomeScreen() {
               : 'Open source filters'
           }
         >
-          <Text style={[styles.hamburgerIcon, { color: Colors[colorScheme].text }]}>
+          <Text
+            style={[
+              styles.hamburgerIcon,
+              { color: selectedSources.size < totalSources ? AccentColor : Colors[colorScheme].text },
+            ]}
+          >
             {filterMenuVisible ? '✕' : '☰'}
           </Text>
-          {!filterMenuVisible && selectedSources.size < totalSources && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{selectedSources.size}</Text>
-            </View>
-          )}
         </TouchableOpacity>
 
         <View style={styles.headerContent}>
@@ -533,7 +533,6 @@ const styles = StyleSheet.create({
   hamburgerButton: {
     padding: 8,
     marginRight: 12,
-    position: 'relative',
   },
   hamburgerIcon: {
     fontSize: 24,
@@ -545,23 +544,6 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 40,
-  },
-  filterBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: AccentColor,
-    borderRadius: 9,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  filterBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
   },
   briefingBanner: {
     marginHorizontal: 16,

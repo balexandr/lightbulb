@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Linking, RefreshControl } from 'react-native';
+import { Linking, RefreshControl, StyleSheet } from 'react-native';
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import * as Speech from 'expo-speech';
 
+import { AccentColor } from '@/constants/theme';
 import { aiService } from '@/services/aiService';
 import { briefingService } from '@/services/briefingService';
 import { cacheService } from '@/services/cacheService';
@@ -271,8 +272,8 @@ describe('HomeScreen', () => {
     expect(screen.getByText('BBC story')).toBeTruthy();
   });
 
-  describe('filter count badge', () => {
-    it('shows how many sources are selected when not all of them are', async () => {
+  describe('filter indicator', () => {
+    it('colors the filter icon when not every source is selected, with no separate badge', async () => {
       mockNewsService.fetchAllNews.mockResolvedValue([
         makeItem({ id: 'bbc-item', title: 'BBC story', source: { name: 'BBC', type: 'rss' } }),
         makeItem({ id: 'npr-item', title: 'NPR story', source: { name: 'NPR', type: 'rss' }, url: 'https://example.com/npr' }),
@@ -286,42 +287,27 @@ describe('HomeScreen', () => {
       fireEvent.press(nprMatches[nprMatches.length - 1]);
       fireEvent.press(screen.getByText('Apply Filter'));
 
-      await waitFor(() => expect(screen.getByText('1')).toBeTruthy());
-    });
-
-    it('hides the badge when every source is selected', async () => {
-      mockNewsService.fetchAllNews.mockResolvedValue([
-        makeItem({ id: 'bbc-item', title: 'BBC story', source: { name: 'BBC', type: 'rss' } }),
-      ]);
-
-      render(<HomeScreen />);
-      await waitFor(() => screen.getByText('BBC story'));
-
+      await waitFor(() => {
+        const icon = screen.getByText('☰');
+        expect(StyleSheet.flatten(icon.props.style).color).toBe(AccentColor);
+      });
+      // No notification-style count badge - just the colored icon itself.
       expect(screen.queryByText('1')).toBeNull();
     });
 
-    it('is tappable and opens the filter menu, unlike a plain non-interactive label', async () => {
+    it('leaves the icon in its normal color when every source is selected', async () => {
       mockNewsService.fetchAllNews.mockResolvedValue([
         makeItem({ id: 'bbc-item', title: 'BBC story', source: { name: 'BBC', type: 'rss' } }),
-        makeItem({ id: 'npr-item', title: 'NPR story', source: { name: 'NPR', type: 'rss' }, url: 'https://example.com/npr' }),
       ]);
 
       render(<HomeScreen />);
       await waitFor(() => screen.getByText('BBC story'));
-      fireEvent.press(screen.getByText('☰'));
-      const nprMatches = screen.getAllByText('NPR');
-      fireEvent.press(nprMatches[nprMatches.length - 1]);
-      fireEvent.press(screen.getByText('Apply Filter'));
-      await waitFor(() => screen.getByText('1'));
 
-      // The badge sits inside the same button as the ☰/✕ icon - pressing
-      // it (not just the icon) still opens the filter menu.
-      fireEvent.press(screen.getByText('1'));
-
-      expect(screen.getByText('📰 News Outlets')).toBeTruthy();
+      const icon = screen.getByText('☰');
+      expect(StyleSheet.flatten(icon.props.style).color).not.toBe(AccentColor);
     });
 
-    it('describes the selection count in the accessibility label', async () => {
+    it('describes the selection count in the accessibility label even without a visible number', async () => {
       mockNewsService.fetchAllNews.mockResolvedValue([
         makeItem({ id: 'bbc-item', title: 'BBC story', source: { name: 'BBC', type: 'rss' } }),
         makeItem({ id: 'npr-item', title: 'NPR story', source: { name: 'NPR', type: 'rss' }, url: 'https://example.com/npr' }),
