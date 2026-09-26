@@ -616,7 +616,7 @@ const styles = StyleSheet.create({
   },
   sourceContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     opacity: 0.6,
     flex: 1,
   },
