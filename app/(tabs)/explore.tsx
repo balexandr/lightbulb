@@ -1,3 +1,4 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
@@ -144,8 +145,9 @@ export default function ExploreScreen() {
 
         <ThemedView style={styles.section}>
           <ThemedView style={styles.dataUseBox}>
+            <MaterialIcons name="lock" size={16} color={Colors[colorScheme].text} style={styles.dataUseIcon} />
             <ThemedText style={styles.dataUseText}>
-              🔒 Nothing below is ever sold or shared with advertisers. These preferences stay
+              Nothing below is ever sold or shared with advertisers. These preferences stay
               on this device, and only a broad, bucketed version (never your exact answers) is
               sent to our AI provider when you request a summary — used for that one purpose,
               nothing else. See the Privacy Policy in the Legal section below for details.
@@ -489,11 +491,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dataUseBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
     padding: 16,
     borderRadius: 12,
     backgroundColor: 'rgba(52, 199, 89, 0.1)',
   },
+  dataUseIcon: {
+    marginTop: 2,
+  },
   dataUseText: {
+    flex: 1,
     fontSize: 13,
     lineHeight: 20,
     opacity: 0.9,

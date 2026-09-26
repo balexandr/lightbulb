@@ -1,6 +1,7 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image as ExpoImage } from 'expo-image';
 import * as Speech from 'expo-speech';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { CoverageComparisonModal } from '@/components/CoverageComparisonModal';
@@ -28,6 +29,21 @@ import { buildRelatedArticlesIndex } from '@/utils/storyClustering';
 
 const BRIEFING_STORY_COUNT = 5;
 type BriefingState = 'idle' | 'loading' | 'speaking' | 'error';
+type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
+
+const BRIEFING_ICON: Record<BriefingState, MaterialIconName> = {
+  idle: 'headset',
+  loading: 'hourglass-empty',
+  speaking: 'stop',
+  error: 'warning',
+};
+
+const BRIEFING_LABEL: Record<BriefingState, string> = {
+  idle: 'Listen to your daily briefing',
+  loading: 'Preparing your briefing...',
+  speaking: 'Stop briefing',
+  error: 'Briefing unavailable — tap to retry',
+};
 
 export default function HomeScreen() {
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -245,9 +261,10 @@ export default function HomeScreen() {
     }
 
     return (
-      <TouchableOpacity style={styles.comparisonRow} onPress={() => handleShowComparison(item)}>
+      <TouchableOpacity style={[styles.comparisonRow, styles.rowWithGap]} onPress={() => handleShowComparison(item)}>
+        <MaterialIcons name="compare-arrows" size={14} color={Colors[colorScheme].text} style={styles.comparisonIcon} />
         <Text style={styles.comparisonText}>
-          🔀 See how {related.length} other {related.length === 1 ? 'outlet' : 'outlets'} covered this
+          See how {related.length} other {related.length === 1 ? 'outlet' : 'outlets'} covered this
         </Text>
       </TouchableOpacity>
     );
@@ -383,14 +400,11 @@ export default function HomeScreen() {
               : 'Open source filters'
           }
         >
-          <Text
-            style={[
-              styles.hamburgerIcon,
-              { color: selectedSources.size < totalSources ? AccentColor : Colors[colorScheme].text },
-            ]}
-          >
-            {filterMenuVisible ? '✕' : '☰'}
-          </Text>
+          <MaterialIcons
+            name={filterMenuVisible ? 'close' : 'filter-list'}
+            size={24}
+            color={selectedSources.size < totalSources ? AccentColor : Colors[colorScheme].text}
+          />
         </TouchableOpacity>
 
         <View style={styles.headerContent}>
@@ -412,12 +426,10 @@ export default function HomeScreen() {
           onPress={handleToggleBriefing}
           disabled={briefingState === 'loading'}
         >
-          <Text style={styles.briefingText}>
-            {briefingState === 'loading' && '⏳ Preparing your briefing...'}
-            {briefingState === 'speaking' && '⏹ Stop briefing'}
-            {briefingState === 'error' && '⚠️ Briefing unavailable — tap to retry'}
-            {briefingState === 'idle' && '🎧 Listen to your daily briefing'}
-          </Text>
+          <View style={styles.briefingRow}>
+            <MaterialIcons name={BRIEFING_ICON[briefingState]} size={16} color={AccentColor} />
+            <Text style={styles.briefingText}>{BRIEFING_LABEL[briefingState]}</Text>
+          </View>
         </TouchableOpacity>
       )}
 
@@ -534,10 +546,6 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 12,
   },
-  hamburgerIcon: {
-    fontSize: 24,
-    fontWeight: '300',
-  },
   headerContent: {
     flex: 1,
     alignItems: 'center',
@@ -552,6 +560,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     backgroundColor: 'rgba(255, 193, 7, 0.12)',
+  },
+  briefingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   briefingText: {
     fontSize: 14,
@@ -642,6 +655,14 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(128, 128, 128, 0.2)',
+  },
+  rowWithGap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  comparisonIcon: {
+    opacity: 0.7,
   },
   comparisonText: {
     fontSize: 12,

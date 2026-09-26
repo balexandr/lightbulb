@@ -1,3 +1,4 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -87,9 +88,12 @@ export function IlluminateModal({ visible, onClose, title, loading, fromCache, e
     >
       <ThemedView style={styles.container}>
         <View style={styles.header}>
-          <ThemedText type="title" style={styles.headerTitle}>💡 Illuminate</ThemedText>
+          <View style={styles.headerTitleRow}>
+            <MaterialIcons name="lightbulb" size={22} color={Colors[colorScheme].text} />
+            <ThemedText type="title" style={styles.headerTitle}>Illuminate</ThemedText>
+          </View>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <ThemedText style={styles.closeButtonText}>✕</ThemedText>
+            <MaterialIcons name="close" size={24} color={Colors[colorScheme].text} />
           </TouchableOpacity>
         </View>
 
@@ -99,8 +103,9 @@ export function IlluminateModal({ visible, onClose, title, loading, fromCache, e
           </ThemedText>
 
           {fromCache && !loading && (
-            <View style={styles.cacheBadge}>
-              <ThemedText style={styles.cacheText}>💾 Cached explanation</ThemedText>
+            <View style={[styles.cacheBadge, styles.rowWithGap]}>
+              <MaterialIcons name="cached" size={14} color="#4CAF50" />
+              <ThemedText style={styles.cacheText}>Cached explanation</ThemedText>
             </View>
           )}
 
@@ -112,35 +117,42 @@ export function IlluminateModal({ visible, onClose, title, loading, fromCache, e
           ) : explanation ? (
             <>
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>📝 What&apos;s This About?</ThemedText>
+                <View style={[styles.sectionHeader, styles.rowWithGap]}>
+                  <MaterialIcons name="description" size={16} color={Colors[colorScheme].text} />
+                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>What&apos;s This About?</ThemedText>
                 </View>
                 <ThemedText style={styles.sectionContent}>{explanation.summary}</ThemedText>
               </View>
 
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>🤔 Why Is This Happening?</ThemedText>
+                <View style={[styles.sectionHeader, styles.rowWithGap]}>
+                  <MaterialIcons name="psychology" size={16} color={Colors[colorScheme].text} />
+                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Why Is This Happening?</ThemedText>
                 </View>
                 <ThemedText style={styles.sectionContent}>{explanation.why}</ThemedText>
               </View>
 
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>🎯 How Does This Affect You?</ThemedText>
+                <View style={[styles.sectionHeader, styles.rowWithGap]}>
+                  <MaterialIcons name="gps-fixed" size={16} color={Colors[colorScheme].text} />
+                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>How Does This Affect You?</ThemedText>
                 </View>
                 <ThemedText style={styles.sectionContent}>{explanation.impact}</ThemedText>
               </View>
 
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>✓ Source Credibility</ThemedText>
+                <View style={[styles.sectionHeader, styles.rowWithGap]}>
+                  <MaterialIcons name="verified" size={16} color={Colors[colorScheme].text} />
+                  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>Source Credibility</ThemedText>
                 </View>
                 <ThemedText style={styles.sectionContent}>{explanation.credibility}</ThemedText>
               </View>
 
               <View style={styles.transparencyBox}>
-                <ThemedText style={styles.transparencyTitle}>🔍 Show your work</ThemedText>
+                <View style={styles.rowWithGap}>
+                  <MaterialIcons name="visibility" size={14} color={Colors[colorScheme].text} />
+                  <ThemedText style={styles.transparencyTitle}>Show your work</ThemedText>
+                </View>
                 {bucket && (
                   <ThemedText style={styles.transparencyText}>{describeBucket(bucket)}</ThemedText>
                 )}
@@ -191,8 +203,9 @@ export function IlluminateModal({ visible, onClose, title, loading, fromCache, e
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <TouchableOpacity onPress={() => setFlagOpen(true)}>
-                      <ThemedText style={styles.flagToggleText}>🚩 Flag this explanation</ThemedText>
+                    <TouchableOpacity onPress={() => setFlagOpen(true)} style={styles.rowWithGap}>
+                      <MaterialIcons name="flag" size={14} color={Colors[colorScheme].text} style={{ opacity: 0.5 }} />
+                      <ThemedText style={styles.flagToggleText}>Flag this explanation</ThemedText>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -222,15 +235,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(128, 128, 128, 0.2)',
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   headerTitle: {
     fontSize: 24,
   },
   closeButton: {
     padding: 8,
   },
-  closeButtonText: {
-    fontSize: 24,
-    fontWeight: '300',
+  rowWithGap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   content: {
     flex: 1,

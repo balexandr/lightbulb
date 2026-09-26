@@ -1,3 +1,4 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text } from 'react-native';
 
@@ -35,8 +36,9 @@ export function IlluminateButton({ onPress }: IlluminateButtonProps) {
       }}
       style={[styles.button, isHovered && styles.buttonHovered]}
     >
-      <Animated.View style={{ transform: [{ scale }] }}>
-        <Text style={styles.text}>💡 Illuminate</Text>
+      <Animated.View style={[styles.row, { transform: [{ scale }] }]}>
+        <MaterialIcons name="lightbulb" size={14} color={AccentColor} />
+        <Text style={styles.text}>Illuminate</Text>
       </Animated.View>
     </Pressable>
   );
@@ -52,6 +54,11 @@ const styles = StyleSheet.create({
   },
   buttonHovered: {
     backgroundColor: 'rgba(255, 193, 7, 0.35)',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   text: {
     fontSize: 12,

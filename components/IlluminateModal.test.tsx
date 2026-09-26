@@ -27,12 +27,12 @@ describe('IlluminateModal', () => {
 
   it('shows the cache badge only when fromCache is true and not loading', () => {
     render(<IlluminateModal visible title="A headline" explanation={explanation} fromCache onClose={jest.fn()} />);
-    expect(screen.getByText('💾 Cached explanation')).toBeTruthy();
+    expect(screen.getByText('Cached explanation')).toBeTruthy();
   });
 
   it('hides the cache badge while still loading', () => {
     render(<IlluminateModal visible title="A headline" loading fromCache onClose={jest.fn()} />);
-    expect(screen.queryByText('💾 Cached explanation')).toBeNull();
+    expect(screen.queryByText('Cached explanation')).toBeNull();
   });
 
   it('shows an error state when there is no explanation and it is not loading', () => {
@@ -44,20 +44,20 @@ describe('IlluminateModal', () => {
     const onClose = jest.fn();
     render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={onClose} />);
 
-    fireEvent.press(screen.getByText('✕'));
+    fireEvent.press(screen.UNSAFE_getByProps({ name: 'close' }).parent);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   describe('"flag this explanation" (§18.5)', () => {
     it('does not show the flag affordance when onFlag is not provided', () => {
       render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} />);
-      expect(screen.queryByText('🚩 Flag this explanation')).toBeNull();
+      expect(screen.queryByText('Flag this explanation')).toBeNull();
     });
 
     it('opens a reason picker when the flag affordance is tapped', () => {
       render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} onFlag={jest.fn()} />);
 
-      fireEvent.press(screen.getByText('🚩 Flag this explanation'));
+      fireEvent.press(screen.getByText('Flag this explanation'));
 
       expect(screen.getByText('Wrong')).toBeTruthy();
       expect(screen.getByText('Off')).toBeTruthy();
@@ -67,7 +67,7 @@ describe('IlluminateModal', () => {
     it('disables submit until a reason is selected', () => {
       render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} onFlag={jest.fn()} />);
 
-      fireEvent.press(screen.getByText('🚩 Flag this explanation'));
+      fireEvent.press(screen.getByText('Flag this explanation'));
       fireEvent.press(screen.getByText('Submit flag'));
 
       expect(screen.getByText('Submit flag')).toBeTruthy();
@@ -78,7 +78,7 @@ describe('IlluminateModal', () => {
       const onFlag = jest.fn().mockResolvedValue(undefined);
       render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} onFlag={onFlag} />);
 
-      fireEvent.press(screen.getByText('🚩 Flag this explanation'));
+      fireEvent.press(screen.getByText('Flag this explanation'));
       fireEvent.press(screen.getByText('Too persuasive'));
       fireEvent.changeText(screen.getByPlaceholderText('Add details (optional)'), 'This nudged an opinion.');
       fireEvent.press(screen.getByText('Submit flag'));
@@ -91,7 +91,7 @@ describe('IlluminateModal', () => {
       const onFlag = jest.fn().mockResolvedValue(undefined);
       render(<IlluminateModal visible title="A headline" explanation={explanation} onClose={jest.fn()} onFlag={onFlag} />);
 
-      fireEvent.press(screen.getByText('🚩 Flag this explanation'));
+      fireEvent.press(screen.getByText('Flag this explanation'));
       fireEvent.press(screen.getByText('Wrong'));
       fireEvent.press(screen.getByText('Submit flag'));
 

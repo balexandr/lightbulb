@@ -4,11 +4,12 @@ import { StyleSheet } from 'react-native';
 import { IlluminateButton } from './IlluminateButton';
 
 describe('IlluminateButton', () => {
-  it('renders the default label and calls onPress when pressed', () => {
+  it('renders a lightbulb icon and label, and calls onPress when pressed', () => {
     const onPress = jest.fn();
     render(<IlluminateButton onPress={onPress} />);
 
-    expect(screen.getByText('💡 Illuminate')).toBeTruthy();
+    expect(screen.getByText('Illuminate')).toBeTruthy();
+    expect(screen.UNSAFE_getByProps({ name: 'lightbulb' })).toBeTruthy();
     fireEvent.press(screen.getByTestId('illuminate-button'));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
@@ -22,10 +23,10 @@ describe('IlluminateButton', () => {
 
     fireEvent(button, 'hoverIn');
     expect(flatStyle().backgroundColor).toBe('rgba(255, 193, 7, 0.35)');
-    expect(screen.getByText('💡 Illuminate')).toBeTruthy();
+    expect(screen.UNSAFE_getByProps({ name: 'lightbulb' })).toBeTruthy();
 
     fireEvent(button, 'hoverOut');
     expect(flatStyle().backgroundColor).toBe('rgba(255, 193, 7, 0.15)');
-    expect(screen.getByText('💡 Illuminate')).toBeTruthy();
+    expect(screen.UNSAFE_getByProps({ name: 'lightbulb' })).toBeTruthy();
   });
 });

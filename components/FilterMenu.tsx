@@ -1,3 +1,4 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import React from 'react';
 import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -84,7 +85,7 @@ export function FilterMenu({
           { borderColor: isDark ? '#666' : '#ccc' }
         ]}>
           {selectedSources.has(source) && (
-            <Text style={styles.checkmark}>✓</Text>
+            <MaterialIcons name="check" size={16} color="#FFFFFF" />
           )}
         </View>
         <View style={styles.sourceTextContainer}>
@@ -114,7 +115,7 @@ export function FilterMenu({
           <View style={styles.header}>
             <ThemedText type="title">Filter Sources</ThemedText>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={[styles.closeButtonText, { color: Colors[colorScheme].text }]}>✕</Text>
+              <MaterialIcons name="close" size={24} color={Colors[colorScheme].text} />
             </TouchableOpacity>
           </View>
 
@@ -137,8 +138,9 @@ export function FilterMenu({
             {localSources.length > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionTitleContainer}>
+                  <MaterialIcons name="place" size={18} color={Colors[colorScheme].text} style={styles.sectionTitleIcon} />
                   <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-                    📍 Local News · {readerRegion !== 'unspecified' ? REGION_LABELS[readerRegion] : ''}
+                    Local News · {readerRegion !== 'unspecified' ? REGION_LABELS[readerRegion] : ''}
                   </ThemedText>
                 </View>
                 <ThemedText style={styles.methodologyNote}>
@@ -158,8 +160,9 @@ export function FilterMenu({
             {nationalSources.length > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionTitleContainer}>
+                  <MaterialIcons name="newspaper" size={18} color={Colors[colorScheme].text} style={styles.sectionTitleIcon} />
                   <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-                    📰 News Outlets
+                    News Outlets
                   </ThemedText>
                 </View>
                 <ThemedText style={styles.methodologyNote}>
@@ -192,7 +195,7 @@ export function FilterMenu({
                       { borderColor: isDark ? '#666' : '#ccc' }
                     ]}>
                       {selectedSources.has(source) && (
-                        <Text style={styles.checkmark}>✓</Text>
+                        <MaterialIcons name="check" size={16} color="#FFFFFF" />
                       )}
                     </View>
                     <ThemedText style={styles.sourceName}>{source}</ThemedText>
@@ -247,10 +250,6 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 8,
   },
-  closeButtonText: {
-    fontSize: 24,
-    fontWeight: '300',
-  },
   actionButtons: {
     flexDirection: 'row',
     padding: 16,
@@ -295,6 +294,9 @@ const styles = StyleSheet.create({
     height: 20,
     marginRight: 8,
   },
+  sectionTitleIcon: {
+    marginRight: 8,
+  },
   sectionTitle: {
     fontSize: 16,
   },
@@ -316,11 +318,6 @@ const styles = StyleSheet.create({
   checkboxSelected: {
     backgroundColor: AccentColor,
     borderColor: AccentColor,
-  },
-  checkmark: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   sourceTextContainer: {
     flex: 1,

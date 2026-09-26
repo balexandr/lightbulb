@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Linking, RefreshControl, StyleSheet } from 'react-native';
+import { Linking, RefreshControl } from 'react-native';
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
@@ -158,7 +158,7 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
     await waitFor(() => screen.getByText('A big headline'));
 
-    fireEvent.press(screen.getByText('💡 Illuminate'));
+    fireEvent.press(screen.getByText('Illuminate'));
 
     await waitFor(() => expect(screen.getByText('The summary.')).toBeTruthy());
     expect(mockAiService.explainNews).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-1' }));
@@ -177,7 +177,7 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
     await waitFor(() => screen.getByText('A big headline'));
 
-    fireEvent.press(screen.getByText('💡 Illuminate'));
+    fireEvent.press(screen.getByText('Illuminate'));
 
     await waitFor(() => expect(screen.getByText('Shown because: age 25-34, progressive-leaning.')).toBeTruthy());
   });
@@ -197,11 +197,11 @@ describe('HomeScreen', () => {
       render(<HomeScreen />);
       await waitFor(() => screen.getByText('A big headline'));
 
-      fireEvent.press(screen.getByText('💡 Illuminate'));
+      fireEvent.press(screen.getByText('Illuminate'));
       await waitFor(() => screen.getByText('The summary.'));
 
       Date.now = () => 1_000_000 + 9_000; // 9s dwell, past the 8s "full read" threshold
-      fireEvent.press(screen.getByText('✕'));
+      fireEvent.press(screen.UNSAFE_getByProps({ name: 'close' }).parent);
 
       await waitFor(() =>
         expect(mockEngagementService.recordIlluminateSession).toHaveBeenCalledWith('BBC', 9_000)
@@ -223,11 +223,11 @@ describe('HomeScreen', () => {
       render(<HomeScreen />);
       await waitFor(() => screen.getByText('A big headline'));
 
-      fireEvent.press(screen.getByText('💡 Illuminate'));
+      fireEvent.press(screen.getByText('Illuminate'));
       await waitFor(() => screen.getByText('The summary.'));
 
       Date.now = () => 1_000_000 + 500; // 0.5s dwell
-      fireEvent.press(screen.getByText('✕'));
+      fireEvent.press(screen.UNSAFE_getByProps({ name: 'close' }).parent);
 
       await waitFor(() =>
         expect(mockEngagementService.recordIlluminateSession).toHaveBeenCalledWith('BBC', 500)
@@ -264,7 +264,7 @@ describe('HomeScreen', () => {
     await waitFor(() => screen.getByText('BBC story'));
     expect(screen.getByText('NPR story')).toBeTruthy();
 
-    fireEvent.press(screen.getByText('☰'));
+    fireEvent.press(screen.UNSAFE_getByProps({ name: 'filter-list' }).parent);
     const nprMatches = screen.getAllByText('NPR');
     fireEvent.press(nprMatches[nprMatches.length - 1]);
 
@@ -282,14 +282,14 @@ describe('HomeScreen', () => {
       render(<HomeScreen />);
       await waitFor(() => screen.getByText('BBC story'));
 
-      fireEvent.press(screen.getByText('☰'));
+      fireEvent.press(screen.UNSAFE_getByProps({ name: 'filter-list' }).parent);
       const nprMatches = screen.getAllByText('NPR');
       fireEvent.press(nprMatches[nprMatches.length - 1]);
       fireEvent.press(screen.getByText('Apply Filter'));
 
       await waitFor(() => {
-        const icon = screen.getByText('☰');
-        expect(StyleSheet.flatten(icon.props.style).color).toBe(AccentColor);
+        const icon = screen.UNSAFE_getByProps({ name: 'filter-list' });
+        expect(icon.props.color).toBe(AccentColor);
       });
       // No notification-style count badge - just the colored icon itself.
       expect(screen.queryByText('1')).toBeNull();
@@ -303,8 +303,8 @@ describe('HomeScreen', () => {
       render(<HomeScreen />);
       await waitFor(() => screen.getByText('BBC story'));
 
-      const icon = screen.getByText('☰');
-      expect(StyleSheet.flatten(icon.props.style).color).not.toBe(AccentColor);
+      const icon = screen.UNSAFE_getByProps({ name: 'filter-list' });
+      expect(icon.props.color).not.toBe(AccentColor);
     });
 
     it('describes the selection count in the accessibility label even without a visible number', async () => {
@@ -315,7 +315,7 @@ describe('HomeScreen', () => {
 
       render(<HomeScreen />);
       await waitFor(() => screen.getByText('BBC story'));
-      fireEvent.press(screen.getByText('☰'));
+      fireEvent.press(screen.UNSAFE_getByProps({ name: 'filter-list' }).parent);
       const nprMatches = screen.getAllByText('NPR');
       fireEvent.press(nprMatches[nprMatches.length - 1]);
       fireEvent.press(screen.getByText('Apply Filter'));
@@ -498,7 +498,7 @@ describe('HomeScreen', () => {
 
     fireEvent.press(screen.getAllByText(/See how 1 other outlet covered this/)[0]);
 
-    await waitFor(() => expect(screen.getByText('🔀 Coverage Comparison')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Coverage Comparison')).toBeTruthy());
     // Appears once in the feed card behind the modal, once inside the modal.
     expect(screen.getAllByText('Senate passes sweeping climate legislation bill')).toHaveLength(2);
   });
@@ -511,14 +511,14 @@ describe('HomeScreen', () => {
       render(<HomeScreen />);
       await waitFor(() => screen.getByText('A big headline'));
 
-      fireEvent.press(screen.getByText('🎧 Listen to your daily briefing'));
+      fireEvent.press(screen.getByText('Listen to your daily briefing'));
 
       await waitFor(() => expect(mockBriefingService.getScript).toHaveBeenCalled());
       await waitFor(() => expect(mockSpeech.speak).toHaveBeenCalledWith(
         'Good morning, here is your briefing.',
         expect.objectContaining({ onDone: expect.any(Function) })
       ));
-      await waitFor(() => expect(screen.getByText('⏹ Stop briefing')).toBeTruthy());
+      await waitFor(() => expect(screen.getByText('Stop briefing')).toBeTruthy());
     });
 
     it('stops speech and resets to idle when tapped again while speaking', async () => {
@@ -528,13 +528,13 @@ describe('HomeScreen', () => {
       render(<HomeScreen />);
       await waitFor(() => screen.getByText('A big headline'));
 
-      fireEvent.press(screen.getByText('🎧 Listen to your daily briefing'));
-      await waitFor(() => screen.getByText('⏹ Stop briefing'));
+      fireEvent.press(screen.getByText('Listen to your daily briefing'));
+      await waitFor(() => screen.getByText('Stop briefing'));
 
-      fireEvent.press(screen.getByText('⏹ Stop briefing'));
+      fireEvent.press(screen.getByText('Stop briefing'));
 
       expect(mockSpeech.stop).toHaveBeenCalled();
-      await waitFor(() => expect(screen.getByText('🎧 Listen to your daily briefing')).toBeTruthy());
+      await waitFor(() => expect(screen.getByText('Listen to your daily briefing')).toBeTruthy());
     });
 
     it('returns to idle and never calls speak when the briefing request fails', async () => {
@@ -544,7 +544,7 @@ describe('HomeScreen', () => {
       render(<HomeScreen />);
       await waitFor(() => screen.getByText('A big headline'));
 
-      fireEvent.press(screen.getByText('🎧 Listen to your daily briefing'));
+      fireEvent.press(screen.getByText('Listen to your daily briefing'));
 
       await waitFor(() => expect(screen.getByText(/Briefing unavailable/)).toBeTruthy());
       expect(mockSpeech.speak).not.toHaveBeenCalled();
@@ -555,7 +555,7 @@ describe('HomeScreen', () => {
       render(<HomeScreen />);
 
       await waitFor(() => expect(screen.getByText(/No articles from selected sources/)).toBeTruthy());
-      expect(screen.queryByText('🎧 Listen to your daily briefing')).toBeNull();
+      expect(screen.queryByText('Listen to your daily briefing')).toBeNull();
     });
   });
 

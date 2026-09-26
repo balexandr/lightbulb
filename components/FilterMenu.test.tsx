@@ -23,7 +23,7 @@ describe('FilterMenu', () => {
   it('lists RSS and Reddit sources under their own sections', () => {
     renderMenu();
 
-    expect(screen.getByText('📰 News Outlets')).toBeTruthy();
+    expect(screen.getByText('News Outlets')).toBeTruthy();
     expect(screen.getByText('Reddit Communities')).toBeTruthy();
     expect(screen.getByText('BBC')).toBeTruthy();
     expect(screen.getByText('NPR')).toBeTruthy();
@@ -51,7 +51,7 @@ describe('FilterMenu', () => {
 
   it('calls onClose from the close button and the apply button', () => {
     const props = renderMenu();
-    fireEvent.press(screen.getByText('✕'));
+    fireEvent.press(screen.UNSAFE_getByProps({ name: 'close' }).parent);
     fireEvent.press(screen.getByText('Apply Filter'));
     expect(props.onClose).toHaveBeenCalledTimes(2);
   });
@@ -82,7 +82,7 @@ describe('FilterMenu', () => {
     it('groups a source tagged with the reader\'s own region into its own section, separate from national outlets', () => {
       renderMenu({ rssSources: ['BBC', 'WHYY'], readerRegion: 'philadelphia' });
 
-      expect(screen.getByText(/📍 Local News.*Philadelphia/)).toBeTruthy();
+      expect(screen.getByText(/Local News.*Philadelphia/)).toBeTruthy();
       // WHYY appears once, under Local News, not duplicated under News Outlets.
       expect(screen.getAllByText('WHYY')).toHaveLength(1);
       expect(screen.getByText('BBC')).toBeTruthy();
@@ -90,13 +90,13 @@ describe('FilterMenu', () => {
 
     it('omits the Local News section when no local sources are present', () => {
       renderMenu({ rssSources: ['BBC', 'NPR'], readerRegion: 'philadelphia' });
-      expect(screen.queryByText(/📍 Local News/)).toBeNull();
+      expect(screen.queryByText(/Local News/)).toBeNull();
     });
 
     it('groups a source from a different hyperlocal city under its own region label', () => {
       renderMenu({ rssSources: ['BBC', 'Gothamist'], readerRegion: 'new-york' });
 
-      expect(screen.getByText(/📍 Local News.*New York City/)).toBeTruthy();
+      expect(screen.getByText(/Local News.*New York City/)).toBeTruthy();
       expect(screen.getByText('Gothamist')).toBeTruthy();
     });
 
@@ -109,7 +109,7 @@ describe('FilterMenu', () => {
     it('does not show any local source at all when the reader has no region set', () => {
       renderMenu({ rssSources: ['BBC', 'WHYY', 'Gothamist'], readerRegion: 'unspecified' });
 
-      expect(screen.queryByText(/📍 Local News/)).toBeNull();
+      expect(screen.queryByText(/Local News/)).toBeNull();
       expect(screen.queryByText('WHYY')).toBeNull();
       expect(screen.queryByText('Gothamist')).toBeNull();
     });

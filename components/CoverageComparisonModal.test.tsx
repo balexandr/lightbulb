@@ -19,7 +19,7 @@ describe('CoverageComparisonModal', () => {
     render(
       <CoverageComparisonModal visible mainItem={null} relatedItems={[]} onClose={jest.fn()} onOpenArticle={jest.fn()} />
     );
-    expect(screen.queryByText('🔀 Coverage Comparison')).toBeNull();
+    expect(screen.queryByText('Coverage Comparison')).toBeNull();
   });
 
   it('lists the main item and every related item, each with its source', () => {
@@ -69,7 +69,7 @@ describe('CoverageComparisonModal', () => {
       <CoverageComparisonModal visible mainItem={makeItem()} relatedItems={[]} onClose={onClose} onOpenArticle={jest.fn()} />
     );
 
-    fireEvent.press(screen.getByText('✕'));
+    fireEvent.press(screen.UNSAFE_getByProps({ name: 'close' }).parent);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

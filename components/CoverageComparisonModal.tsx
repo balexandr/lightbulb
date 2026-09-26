@@ -1,5 +1,7 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { NewsItem } from '@/types/news';
 import { ThemedText } from './themed-text';
@@ -35,9 +37,12 @@ export function CoverageComparisonModal({ visible, onClose, mainItem, relatedIte
     >
       <ThemedView style={styles.container}>
         <View style={styles.header}>
-          <ThemedText type="title" style={styles.headerTitle}>🔀 Coverage Comparison</ThemedText>
+          <View style={styles.headerTitleRow}>
+            <MaterialIcons name="compare-arrows" size={20} color={Colors[colorScheme].text} />
+            <ThemedText type="title" style={styles.headerTitle}>Coverage Comparison</ThemedText>
+          </View>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <ThemedText style={styles.closeButtonText}>✕</ThemedText>
+            <MaterialIcons name="close" size={24} color={Colors[colorScheme].text} />
           </TouchableOpacity>
         </View>
 
@@ -82,15 +87,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(128, 128, 128, 0.2)',
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   headerTitle: {
     fontSize: 22,
   },
   closeButton: {
     padding: 8,
-  },
-  closeButtonText: {
-    fontSize: 24,
-    fontWeight: '300',
   },
   content: {
     flex: 1,
