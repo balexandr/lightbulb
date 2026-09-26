@@ -377,12 +377,22 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.hamburgerButton}
           onPress={handleToggleFilterMenu}
+          accessibilityLabel={
+            selectedSources.size < totalSources
+              ? `Open source filters. ${selectedSources.size} of ${totalSources} sources selected.`
+              : 'Open source filters'
+          }
         >
           <Text style={[styles.hamburgerIcon, { color: Colors[colorScheme].text }]}>
             {filterMenuVisible ? '✕' : '☰'}
           </Text>
+          {!filterMenuVisible && selectedSources.size < totalSources && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{selectedSources.size}</Text>
+            </View>
+          )}
         </TouchableOpacity>
-        
+
         <View style={styles.headerContent}>
           <Text style={[
             styles.logo,
@@ -392,14 +402,8 @@ export default function HomeScreen() {
           </Text>
           <ThemedText style={styles.subtitle}>Illuminating the news</ThemedText>
         </View>
-        
-        <View style={styles.headerRight}>
-          {selectedSources.size < totalSources && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{selectedSources.size}</Text>
-            </View>
-          )}
-        </View>
+
+        <View style={styles.headerRight} />
       </ThemedView>
 
       {filteredNews.length > 0 && (
@@ -529,6 +533,7 @@ const styles = StyleSheet.create({
   hamburgerButton: {
     padding: 8,
     marginRight: 12,
+    position: 'relative',
   },
   hamburgerIcon: {
     fontSize: 24,
@@ -540,20 +545,22 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 40,
-    alignItems: 'flex-end',
   },
   filterBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
     backgroundColor: AccentColor,
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   filterBadgeText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
   },
   briefingBanner: {

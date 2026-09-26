@@ -271,6 +271,75 @@ describe('HomeScreen', () => {
     expect(screen.getByText('BBC story')).toBeTruthy();
   });
 
+  describe('filter count badge', () => {
+    it('shows how many sources are selected when not all of them are', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ id: 'bbc-item', title: 'BBC story', source: { name: 'BBC', type: 'rss' } }),
+        makeItem({ id: 'npr-item', title: 'NPR story', source: { name: 'NPR', type: 'rss' }, url: 'https://example.com/npr' }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('BBC story'));
+
+      fireEvent.press(screen.getByText('☰'));
+      const nprMatches = screen.getAllByText('NPR');
+      fireEvent.press(nprMatches[nprMatches.length - 1]);
+      fireEvent.press(screen.getByText('Apply Filter'));
+
+      await waitFor(() => expect(screen.getByText('1')).toBeTruthy());
+    });
+
+    it('hides the badge when every source is selected', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ id: 'bbc-item', title: 'BBC story', source: { name: 'BBC', type: 'rss' } }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('BBC story'));
+
+      expect(screen.queryByText('1')).toBeNull();
+    });
+
+    it('is tappable and opens the filter menu, unlike a plain non-interactive label', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ id: 'bbc-item', title: 'BBC story', source: { name: 'BBC', type: 'rss' } }),
+        makeItem({ id: 'npr-item', title: 'NPR story', source: { name: 'NPR', type: 'rss' }, url: 'https://example.com/npr' }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('BBC story'));
+      fireEvent.press(screen.getByText('☰'));
+      const nprMatches = screen.getAllByText('NPR');
+      fireEvent.press(nprMatches[nprMatches.length - 1]);
+      fireEvent.press(screen.getByText('Apply Filter'));
+      await waitFor(() => screen.getByText('1'));
+
+      // The badge sits inside the same button as the ☰/✕ icon - pressing
+      // it (not just the icon) still opens the filter menu.
+      fireEvent.press(screen.getByText('1'));
+
+      expect(screen.getByText('📰 News Outlets')).toBeTruthy();
+    });
+
+    it('describes the selection count in the accessibility label', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ id: 'bbc-item', title: 'BBC story', source: { name: 'BBC', type: 'rss' } }),
+        makeItem({ id: 'npr-item', title: 'NPR story', source: { name: 'NPR', type: 'rss' }, url: 'https://example.com/npr' }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('BBC story'));
+      fireEvent.press(screen.getByText('☰'));
+      const nprMatches = screen.getAllByText('NPR');
+      fireEvent.press(nprMatches[nprMatches.length - 1]);
+      fireEvent.press(screen.getByText('Apply Filter'));
+
+      await waitFor(() =>
+        expect(screen.getByLabelText('Open source filters. 1 of 2 sources selected.')).toBeTruthy()
+      );
+    });
+  });
+
   describe('cross-lean open tracking (§17.7)', () => {
     it('records an open when the source has a different lean than the reader\'s stance', async () => {
       await preferencesService.savePreferences({ politicalStandpoint: 'progressive' });
