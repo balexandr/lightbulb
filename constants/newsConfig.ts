@@ -15,16 +15,29 @@ export interface SourceTrustInfo {
   bylineTransparency: boolean;
 }
 
-// §17.7: a coarse, self-assessed general characterization used only to
-// detect when a reader opens a source unlike their own stated political
-// stance - not a scientific rating, and individual articles from any outlet
-// can cut against its general lean. 'not-applicable' is for sources that
-// aren't general-interest political-news editorial outlets (tech trade
-// press, link aggregators) - they never count toward or against the §17.7
-// count either way. Same self-assessed caveat as §17.2/§13's source list -
-// verify/revisit before leaning on this for anything beyond the in-app
-// transparency framing §17.7 requires.
+// A coarse, self-assessed general characterization - not a scientific
+// rating, and individual articles from any outlet can cut against its
+// general lean. Two consumers: §17.7 (detecting when a reader opens a
+// source unlike their own stated political stance) and §16.3's per-card
+// lean badge (LEAN_LABELS below) - both purely descriptive, never scored
+// or ranked. 'not-applicable' is for sources that aren't general-interest
+// political-news editorial outlets (tech trade press, link aggregators) -
+// they never count toward §17.7's tally and never show a badge. Same
+// self-assessed caveat as §17.2/§13's source list - verify/revisit before
+// leaning on this for anything beyond in-app transparency framing.
 export type LeanTag = 'left-leaning' | 'center' | 'right-leaning' | 'not-applicable';
+
+// §16.3's card-level indicator: null means "don't show a badge at all"
+// (not-applicable sources), not "show an empty one." Deliberately no
+// color-coding by political side (no red/blue) - text only, consistent
+// with §17.2's checklist-not-score approach to avoiding a "who decided
+// this" reaction.
+export const LEAN_LABELS: Record<LeanTag, string | null> = {
+  'left-leaning': 'Left-leaning',
+  center: 'Center',
+  'right-leaning': 'Right-leaning',
+  'not-applicable': null,
+};
 
 // §17.4: the small set of regions this app currently has (or buckets
 // preferences into) - not a full state list. Each named city is its own

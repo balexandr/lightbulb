@@ -343,6 +343,42 @@ describe('HomeScreen', () => {
     });
   });
 
+  describe('source lean indicator (§16.3 #6)', () => {
+    it('shows the source\'s self-assessed lean label on the card', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ source: { name: 'NYTimes', type: 'rss' } }),
+      ]);
+
+      render(<HomeScreen />);
+
+      await waitFor(() => expect(screen.getByText(/Left-leaning/)).toBeTruthy());
+    });
+
+    it('omits the badge for a source tagged not-applicable (e.g. tech trade press)', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ source: { name: 'TechCrunch', type: 'rss' } }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+
+      expect(screen.queryByText(/leaning/)).toBeNull();
+      expect(screen.queryByText('• Center')).toBeNull();
+    });
+
+    it('omits the badge for a source with no RSS_FEEDS entry (e.g. Reddit)', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ source: { name: 'r/worldnews', type: 'reddit' } }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+
+      expect(screen.queryByText(/leaning/)).toBeNull();
+      expect(screen.queryByText('• Center')).toBeNull();
+    });
+  });
+
   describe('relevance teaser (§17.1)', () => {
     it('shows a region teaser on a hyperlocal card matching the reader\'s region', async () => {
       await preferencesService.savePreferences({ location: 'philadelphia' });

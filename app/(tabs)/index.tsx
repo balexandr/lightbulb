@@ -8,7 +8,7 @@ import { FilterMenu } from '@/components/FilterMenu';
 import { IlluminateModal } from '@/components/IlluminateModal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { DISABLED_BY_DEFAULT_SOURCES, RSS_FEEDS } from '@/constants/newsConfig';
+import { DISABLED_BY_DEFAULT_SOURCES, LEAN_LABELS, RSS_FEEDS } from '@/constants/newsConfig';
 import { AccentColor, Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { aiService } from '@/services/aiService';
@@ -218,6 +218,18 @@ export default function HomeScreen() {
         <Text style={styles.teaserText}>Relevant to you: {teaser.label}</Text>
       </View>
     );
+  };
+
+  // §16.3 #6: static lookup, no AI call - Reddit items have no RSS_FEEDS
+  // entry (same "no entry" case §17.7's cross-lean tracking already
+  // handles), so they never show a badge either.
+  const renderLeanTag = (item: NewsItem) => {
+    const sourceConfig = RSS_FEEDS.find(feed => feed.name === item.source.name);
+    const leanLabel = sourceConfig && LEAN_LABELS[sourceConfig.lean];
+    if (!leanLabel) {
+      return null;
+    }
+    return <ThemedText style={styles.leanTag}> • {leanLabel}</ThemedText>;
   };
 
   const renderComparisonPill = (item: NewsItem) => {
@@ -437,6 +449,7 @@ export default function HomeScreen() {
                 {item.domain && (
                   <ThemedText style={styles.domain}> • {item.domain}</ThemedText>
                 )}
+                {renderLeanTag(item)}
               </View>
               <TouchableOpacity
                 style={styles.illuminateButton}
@@ -615,6 +628,10 @@ const styles = StyleSheet.create({
   },
   domain: {
     fontSize: 12,
+  },
+  leanTag: {
+    fontSize: 12,
+    opacity: 0.6,
   },
   illuminateButton: {
     paddingHorizontal: 12,
