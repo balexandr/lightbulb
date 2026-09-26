@@ -469,9 +469,6 @@ export default function HomeScreen() {
                 )}
                 <ThemedText style={styles.source} numberOfLines={2}>
                   {item.source.name}
-                  {item.domain && (
-                    <ThemedText style={styles.domain}> • {item.domain}</ThemedText>
-                  )}
                   {renderLeanTag(item)}
                 </ThemedText>
               </View>
@@ -630,9 +627,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   source: {
-    fontSize: 12,
-  },
-  domain: {
     fontSize: 12,
   },
   leanTag: {
