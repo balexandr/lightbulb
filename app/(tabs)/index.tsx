@@ -462,16 +462,18 @@ export default function HomeScreen() {
             <ThemedView style={styles.metadata}>
               <View style={styles.sourceContainer}>
                 {item.source.icon && (
-                  <Image 
-                    source={{ uri: item.source.icon }} 
+                  <Image
+                    source={{ uri: item.source.icon }}
                     style={styles.sourceIcon}
                   />
                 )}
-                <ThemedText style={styles.source}>{item.source.name}</ThemedText>
-                {item.domain && (
-                  <ThemedText style={styles.domain}> • {item.domain}</ThemedText>
-                )}
-                {renderLeanTag(item)}
+                <ThemedText style={styles.source} numberOfLines={2}>
+                  {item.source.name}
+                  {item.domain && (
+                    <ThemedText style={styles.domain}> • {item.domain}</ThemedText>
+                  )}
+                  {renderLeanTag(item)}
+                </ThemedText>
               </View>
               <IlluminateButton onPress={() => handleIlluminate(item)} />
             </ThemedView>
@@ -611,13 +613,13 @@ const styles = StyleSheet.create({
   },
   metadata: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginTop: 8,
   },
   sourceContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     opacity: 0.6,
     flex: 1,
   },

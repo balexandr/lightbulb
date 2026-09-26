@@ -99,7 +99,7 @@ describe('HomeScreen', () => {
     render(<HomeScreen />);
 
     await waitFor(() => expect(screen.getByText('A big headline')).toBeTruthy());
-    expect(screen.getByText('BBC')).toBeTruthy();
+    expect(screen.getByText(/BBC/)).toBeTruthy();
   });
 
   it('renders a fast source\'s articles immediately, before a slower source resolves', async () => {
