@@ -7,10 +7,11 @@ interface IlluminateButtonProps {
   onPress: () => void;
 }
 
-// A hover-only flourish for web/mouse users, playing on the feature's own
-// name: the button "lights up" (stronger background, an added sparkle)
-// and scales up slightly on hover. Pressable's onHoverIn/onHoverOut simply
-// never fire without a mouse, so this is inert on iOS/Android - no
+// A hover-only flourish for web/mouse users: the button "lights up"
+// (stronger background) and scales up slightly on hover. No emoji
+// swapping - keep the icon fixed, that kind of cutesy micro-animation
+// reads as generic AI-generated UI. Pressable's onHoverIn/onHoverOut
+// simply never fire without a mouse, so this is inert on iOS/Android - no
 // separate touch-platform branch needed.
 export function IlluminateButton({ onPress }: IlluminateButtonProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -35,7 +36,7 @@ export function IlluminateButton({ onPress }: IlluminateButtonProps) {
       style={[styles.button, isHovered && styles.buttonHovered]}
     >
       <Animated.View style={{ transform: [{ scale }] }}>
-        <Text style={styles.text}>{isHovered ? '✨ Illuminate' : '💡 Illuminate'}</Text>
+        <Text style={styles.text}>💡 Illuminate</Text>
       </Animated.View>
     </Pressable>
   );
