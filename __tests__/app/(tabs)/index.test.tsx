@@ -351,7 +351,10 @@ describe('HomeScreen', () => {
 
       render(<HomeScreen />);
 
-      await waitFor(() => expect(screen.getByText(/Left-leaning/)).toBeTruthy());
+      // "Source: X", not just "X" - this describes the outlet, not this
+      // specific article (a neutral story from a left-leaning-tagged
+      // outlet still gets this label, so it must say what it's about).
+      await waitFor(() => expect(screen.getByText(/Source: Left-leaning/)).toBeTruthy());
     });
 
     it('omits the badge for a source tagged not-applicable (e.g. tech trade press)', async () => {

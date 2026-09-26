@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Image, Linking, RefreshControl, StyleSheet
 
 import { CoverageComparisonModal } from '@/components/CoverageComparisonModal';
 import { FilterMenu } from '@/components/FilterMenu';
+import { IlluminateButton } from '@/components/IlluminateButton';
 import { IlluminateModal } from '@/components/IlluminateModal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -222,14 +223,19 @@ export default function HomeScreen() {
 
   // §16.3 #6: static lookup, no AI call - Reddit items have no RSS_FEEDS
   // entry (same "no entry" case §17.7's cross-lean tracking already
-  // handles), so they never show a badge either.
+  // handles), so they never show a badge either. Labeled "Source: X", not
+  // just "X" - this is a blanket characterization of the outlet, reused
+  // on every one of its articles regardless of that article's actual
+  // content (a weather story from a left-leaning-tagged outlet still
+  // shows "Source: Left-leaning") - the label needs to say what it's
+  // describing, or it reads as a claim about the specific article.
   const renderLeanTag = (item: NewsItem) => {
     const sourceConfig = RSS_FEEDS.find(feed => feed.name === item.source.name);
     const leanLabel = sourceConfig && LEAN_LABELS[sourceConfig.lean];
     if (!leanLabel) {
       return null;
     }
-    return <ThemedText style={styles.leanTag}> • {leanLabel}</ThemedText>;
+    return <ThemedText style={styles.leanTag}> • Source: {leanLabel}</ThemedText>;
   };
 
   const renderComparisonPill = (item: NewsItem) => {
@@ -451,12 +457,7 @@ export default function HomeScreen() {
                 )}
                 {renderLeanTag(item)}
               </View>
-              <TouchableOpacity
-                style={styles.illuminateButton}
-                onPress={() => handleIlluminate(item)}
-              >
-                <Text style={styles.illuminateText}>💡 Illuminate</Text>
-              </TouchableOpacity>
+              <IlluminateButton onPress={() => handleIlluminate(item)} />
             </ThemedView>
             {renderComparisonPill(item)}
           </ThemedView>
@@ -633,18 +634,6 @@ const styles = StyleSheet.create({
   leanTag: {
     fontSize: 12,
     opacity: 0.6,
-  },
-  illuminateButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 193, 7, 0.15)',
-    marginLeft: 8,
-  },
-  illuminateText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: AccentColor,
   },
   teaserBadge: {
     alignSelf: 'flex-start',
