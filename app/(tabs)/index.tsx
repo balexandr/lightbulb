@@ -1,9 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Image as ExpoImage } from 'expo-image';
 import * as Speech from 'expo-speech';
 import { ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { ArticleImage } from '@/components/ArticleImage';
 import { CoverageComparisonModal } from '@/components/CoverageComparisonModal';
 import { FilterMenu } from '@/components/FilterMenu';
 import { IlluminateButton } from '@/components/IlluminateButton';
@@ -449,14 +449,7 @@ export default function HomeScreen() {
             {renderRelevanceTeaser(item)}
             {item.imageUrl && (
               <TouchableOpacity onPress={() => handleOpenArticle(item)}>
-                <View style={styles.imageContainer}>
-                  <ExpoImage
-                    source={{ uri: item.imageUrl }}
-                    style={styles.articleImage}
-                    contentFit="cover"
-                    contentPosition="top"
-                  />
-                </View>
+                <ArticleImage uri={item.imageUrl} />
               </TouchableOpacity>
             )}
             <ThemedView style={styles.metadata}>
@@ -596,17 +589,6 @@ const styles = StyleSheet.create({
   },
   titleLink: {
     marginBottom: 4,
-  },
-  imageContainer: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    marginTop: 12,
-    marginBottom: 8,
-    overflow: 'hidden',
-  },
-  articleImage: {
-    width: '100%',
-    height: 200,
   },
   metadata: {
     flexDirection: 'row',
