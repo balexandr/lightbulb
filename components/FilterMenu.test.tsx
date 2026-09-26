@@ -12,6 +12,7 @@ function renderMenu(overrides: Partial<React.ComponentProps<typeof FilterMenu>> 
     onToggleSource: jest.fn(),
     onSelectAll: jest.fn(),
     onClearAll: jest.fn(),
+    readerRegion: 'unspecified' as const,
     ...overrides,
   };
   render(<FilterMenu {...props} />);
@@ -78,32 +79,51 @@ describe('FilterMenu', () => {
   });
 
   describe('hyperlocal layer (§17.4)', () => {
-    it('groups a source tagged with a local region into its own section, separate from national outlets', () => {
-      renderMenu({ rssSources: ['BBC', 'WHYY'] });
+    it('groups a source tagged with the reader\'s own region into its own section, separate from national outlets', () => {
+      renderMenu({ rssSources: ['BBC', 'WHYY'], readerRegion: 'philadelphia' });
 
-      expect(screen.getByText('📍 Local News')).toBeTruthy();
-      expect(screen.getByText('Philadelphia')).toBeTruthy();
+      expect(screen.getByText(/📍 Local News.*Philadelphia/)).toBeTruthy();
       // WHYY appears once, under Local News, not duplicated under News Outlets.
       expect(screen.getAllByText('WHYY')).toHaveLength(1);
       expect(screen.getByText('BBC')).toBeTruthy();
     });
 
     it('omits the Local News section when no local sources are present', () => {
-      renderMenu({ rssSources: ['BBC', 'NPR'] });
-      expect(screen.queryByText('📍 Local News')).toBeNull();
+      renderMenu({ rssSources: ['BBC', 'NPR'], readerRegion: 'philadelphia' });
+      expect(screen.queryByText(/📍 Local News/)).toBeNull();
     });
 
     it('groups a source from a different hyperlocal city under its own region label', () => {
-      renderMenu({ rssSources: ['BBC', 'Gothamist'] });
+      renderMenu({ rssSources: ['BBC', 'Gothamist'], readerRegion: 'new-york' });
 
-      expect(screen.getByText('📍 Local News')).toBeTruthy();
-      expect(screen.getByText('New York City')).toBeTruthy();
+      expect(screen.getByText(/📍 Local News.*New York City/)).toBeTruthy();
+      expect(screen.getByText('Gothamist')).toBeTruthy();
     });
 
     it('still toggles a local source like any other source', () => {
-      const props = renderMenu({ rssSources: ['WHYY'] });
+      const props = renderMenu({ rssSources: ['WHYY'], readerRegion: 'philadelphia' });
       fireEvent.press(screen.getByText('WHYY'));
       expect(props.onToggleSource).toHaveBeenCalledWith('WHYY');
+    });
+
+    it('does not show any local source at all when the reader has no region set', () => {
+      renderMenu({ rssSources: ['BBC', 'WHYY', 'Gothamist'], readerRegion: 'unspecified' });
+
+      expect(screen.queryByText(/📍 Local News/)).toBeNull();
+      expect(screen.queryByText('WHYY')).toBeNull();
+      expect(screen.queryByText('Gothamist')).toBeNull();
+    });
+
+    it('only shows the reader\'s own city\'s local source, not every city\'s', () => {
+      renderMenu({
+        rssSources: ['BBC', 'WHYY', 'Billy Penn', 'Gothamist', 'KQED'],
+        readerRegion: 'philadelphia',
+      });
+
+      expect(screen.getByText('WHYY')).toBeTruthy();
+      expect(screen.getByText('Billy Penn')).toBeTruthy();
+      expect(screen.queryByText('Gothamist')).toBeNull();
+      expect(screen.queryByText('KQED')).toBeNull();
     });
   });
 });

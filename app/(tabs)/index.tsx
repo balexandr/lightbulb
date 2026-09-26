@@ -492,6 +492,7 @@ export default function HomeScreen() {
         onToggleSource={handleToggleSource}
         onSelectAll={handleSelectAll}
         onClearAll={handleClearAll}
+        readerRegion={readerBucket?.region ?? 'unspecified'}
       />
 
       <CoverageComparisonModal

@@ -4,6 +4,7 @@ import { Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } fr
 import { OutletType, REGION_LABELS, RSS_FEEDS, SourceTrustInfo } from '@/constants/newsConfig';
 import { AccentColor, Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { RegionBucket } from '@/services/preferencesService';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -36,6 +37,12 @@ interface FilterMenuProps {
   onToggleSource: (source: string) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
+  // Only sources whose localRegion matches this get grouped into
+  // "Local News" - a reader's own region, not a filter on national
+  // sources. A hyperlocal source for a *different* city than the reader's
+  // simply doesn't appear here at all, rather than showing every city's
+  // local sources to everyone regardless of where they actually are.
+  readerRegion: RegionBucket;
 }
 
 export function FilterMenu({
@@ -47,13 +54,20 @@ export function FilterMenu({
   onToggleSource,
   onSelectAll,
   onClearAll,
+  readerRegion,
 }: FilterMenuProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
 
   // §17.4: sources tagged with a localRegion get their own section instead
   // of blending into the national outlet list.
-  const localSources = rssSources.filter(source => RSS_FEEDS.find(feed => feed.name === source)?.localRegion);
+  const localSources = rssSources.filter(source => {
+    const localRegion = RSS_FEEDS.find(feed => feed.name === source)?.localRegion;
+    return localRegion && localRegion === readerRegion;
+  });
+  // A source tagged for a *different* city than the reader's own region
+  // is neither national nor "the reader's local" - it's simply not shown,
+  // rather than either bucket.
   const nationalSources = rssSources.filter(source => !RSS_FEEDS.find(feed => feed.name === source)?.localRegion);
 
   const renderSourceRow = (source: string) => {
@@ -124,21 +138,17 @@ export function FilterMenu({
               <View style={styles.section}>
                 <View style={styles.sectionTitleContainer}>
                   <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-                    📍 Local News
+                    📍 Local News · {readerRegion !== 'unspecified' ? REGION_LABELS[readerRegion] : ''}
                   </ThemedText>
                 </View>
                 <ThemedText style={styles.methodologyNote}>
-                  Hyperlocal coverage for readers in that area - set your region in Preferences to
-                  have it show up in your feed by default.
+                  Hyperlocal coverage for your region - change it in Preferences to see a
+                  different city&apos;s local sources here instead.
                 </ThemedText>
                 {localSources.map(source => {
-                  const region = RSS_FEEDS.find(feed => feed.name === source)?.localRegion;
                   return (
                     <View key={source}>
                       {renderSourceRow(source)}
-                      {region && (
-                        <ThemedText style={styles.localRegionTag}>{REGION_LABELS[region] ?? region}</ThemedText>
-                      )}
                     </View>
                   );
                 })}
@@ -328,13 +338,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     marginBottom: 12,
     lineHeight: 16,
-  },
-  localRegionTag: {
-    fontSize: 11,
-    opacity: 0.6,
-    marginLeft: 44,
-    marginTop: -8,
-    marginBottom: 8,
   },
   applyButton: {
     margin: 16,
