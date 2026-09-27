@@ -9,20 +9,20 @@ function loadWith(width: number, height: number) {
 }
 
 describe('ArticleImage', () => {
-  it('starts as "cover"/"top" before the image has loaded (the common case is a large, wide photo)', () => {
+  it('starts as "cover"/"center" before the image has loaded (the common case is a large enough photo)', () => {
     render(<ArticleImage uri="https://example.com/a.jpg" />);
     const image = screen.UNSAFE_getByType(Image);
     expect(image.props.contentFit).toBe('cover');
-    expect(image.props.contentPosition).toBe('top');
+    expect(image.props.contentPosition).toBe('center');
   });
 
-  it('stays "cover"/"top" once a large, wide (landscape) image loads', () => {
+  it('stays "cover"/"center" once a large enough image loads, regardless of its aspect ratio', () => {
     render(<ArticleImage uri="https://example.com/a.jpg" />);
-    loadWith(700, 450); // 1.56:1 - a typical wide editorial photo
+    loadWith(700, 450); // wide/landscape
 
-    const image = screen.UNSAFE_getByType(Image);
-    expect(image.props.contentFit).toBe('cover');
-    expect(image.props.contentPosition).toBe('top');
+    const wide = screen.UNSAFE_getByType(Image);
+    expect(wide.props.contentFit).toBe('cover');
+    expect(wide.props.contentPosition).toBe('center');
   });
 
   it('switches to "contain" once a shorter-than-container image loads, to avoid upscaling it blurry', () => {
@@ -30,14 +30,5 @@ describe('ArticleImage', () => {
     loadWith(64, 64); // a small favicon-style fallback image
 
     expect(screen.UNSAFE_getByType(Image).props.contentFit).toBe('contain');
-  });
-
-  it('switches to "center" cropping for a tall, large enough, portrait/headshot-shaped photo', () => {
-    render(<ArticleImage uri="https://example.com/a.jpg" />);
-    loadWith(400, 450); // 0.89:1 - near-square, portrait-shaped, but well over the container's height
-
-    const image = screen.UNSAFE_getByType(Image);
-    expect(image.props.contentFit).toBe('cover');
-    expect(image.props.contentPosition).toBe('center');
   });
 });
