@@ -4,6 +4,9 @@ import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 interface ArticleImageProps {
   uri: string;
+  // 'lead' is the first story in the feed - given a taller max height so it
+  // reads as the top story instead of just another same-sized card.
+  variant?: 'default' | 'lead';
 }
 
 // Before the real image size is known (first render, or still loading),
@@ -16,6 +19,7 @@ const DEFAULT_HEIGHT = 200;
 // crops - see contentFit="contain" below.
 const MIN_HEIGHT = 140;
 const MAX_HEIGHT = 320;
+const LEAD_MAX_HEIGHT = 460;
 
 // Below this native pixel height, treat an image as a small fallback
 // logo/favicon (see newsService.ts's resolveArticleImages - used when no
@@ -44,9 +48,10 @@ function clamp(value: number, min: number, max: number): number {
 // full, via contentFit="contain" - the only crop-free fit mode. Small
 // fallback images get their own modest fixed size instead, to avoid
 // blurry upscaling.
-export function ArticleImage({ uri }: ArticleImageProps) {
+export function ArticleImage({ uri, variant = 'default' }: ArticleImageProps) {
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
+  const maxHeight = variant === 'lead' ? LEAD_MAX_HEIGHT : MAX_HEIGHT;
 
   let height = DEFAULT_HEIGHT;
   if (naturalSize) {
@@ -54,7 +59,7 @@ export function ArticleImage({ uri }: ArticleImageProps) {
       height = SMALL_IMAGE_HEIGHT;
     } else if (containerWidth) {
       const naturalAspectHeight = containerWidth * (naturalSize.height / naturalSize.width);
-      height = clamp(naturalAspectHeight, MIN_HEIGHT, MAX_HEIGHT);
+      height = clamp(naturalAspectHeight, MIN_HEIGHT, maxHeight);
     }
   }
 

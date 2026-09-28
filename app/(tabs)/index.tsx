@@ -24,6 +24,7 @@ import { PreferenceBucket, preferencesService } from '@/services/preferencesServ
 import { AIExplanation, NewsItem } from '@/types/news';
 import { applyEngagementRanking } from '@/utils/engagementRanking';
 import { logger } from '@/utils/logger';
+import { formatRelativeTime } from '@/utils/relativeTime';
 import { computeRelevanceTeaser } from '@/utils/relevanceTeaser';
 import { buildRelatedArticlesIndex } from '@/utils/storyClustering';
 
@@ -439,37 +440,45 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        renderItem={({ item }) => (
-          <ThemedView style={styles.card}>
-            <TouchableOpacity onPress={() => handleOpenArticle(item)}>
-              <ThemedText type="defaultSemiBold" numberOfLines={3} style={styles.titleLink}>
-                {item.title}
-              </ThemedText>
-            </TouchableOpacity>
-            {renderRelevanceTeaser(item)}
-            {item.imageUrl && (
+        renderItem={({ item, index }) => {
+          const isLead = index === 0;
+          return (
+            <ThemedView style={styles.card}>
               <TouchableOpacity onPress={() => handleOpenArticle(item)}>
-                <ArticleImage uri={item.imageUrl} />
-              </TouchableOpacity>
-            )}
-            <ThemedView style={styles.metadata}>
-              <View style={styles.sourceContainer}>
-                {item.source.icon && (
-                  <Image
-                    source={{ uri: item.source.icon }}
-                    style={styles.sourceIcon}
-                  />
-                )}
-                <ThemedText style={styles.source} numberOfLines={2}>
-                  {item.source.name}
-                  {renderLeanTag(item)}
+                <ThemedText
+                  type="defaultSemiBold"
+                  numberOfLines={3}
+                  style={[styles.titleLink, isLead && styles.leadTitle]}
+                >
+                  {item.title}
                 </ThemedText>
-              </View>
-              <IlluminateButton onPress={() => handleIlluminate(item)} />
+              </TouchableOpacity>
+              {renderRelevanceTeaser(item)}
+              {item.imageUrl && (
+                <TouchableOpacity onPress={() => handleOpenArticle(item)}>
+                  <ArticleImage uri={item.imageUrl} variant={isLead ? 'lead' : 'default'} />
+                </TouchableOpacity>
+              )}
+              <ThemedView style={styles.metadata}>
+                <View style={styles.sourceContainer}>
+                  {item.source.icon && (
+                    <Image
+                      source={{ uri: item.source.icon }}
+                      style={styles.sourceIcon}
+                    />
+                  )}
+                  <ThemedText style={styles.source} numberOfLines={2}>
+                    {item.source.name}
+                    {renderLeanTag(item)}
+                    {' • '}{formatRelativeTime(item.publishedAt)}
+                  </ThemedText>
+                </View>
+                <IlluminateButton onPress={() => handleIlluminate(item)} />
+              </ThemedView>
+              {renderComparisonPill(item)}
             </ThemedView>
-            {renderComparisonPill(item)}
-          </ThemedView>
-        )}
+          );
+        }}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -589,6 +598,10 @@ const styles = StyleSheet.create({
   },
   titleLink: {
     marginBottom: 4,
+  },
+  leadTitle: {
+    fontSize: 20,
+    lineHeight: 26,
   },
   metadata: {
     flexDirection: 'row',

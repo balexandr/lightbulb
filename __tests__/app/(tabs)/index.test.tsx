@@ -102,6 +102,37 @@ describe('HomeScreen', () => {
     expect(screen.getByText(/BBC/)).toBeTruthy();
   });
 
+  it('shows a relative publish time alongside the source', async () => {
+    mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
+
+    render(<HomeScreen />);
+
+    // Fixture publishedAt is 2024-01-01 - long enough ago that this reads
+    // as an absolute date rather than "Xh/Xd ago". Matched loosely since
+    // toLocaleDateString can land on Dec 31 or Jan 1 depending on the test
+    // runner's timezone.
+    await waitFor(() => expect(screen.getByText(/, 202[34]$/)).toBeTruthy());
+  });
+
+  it('gives the first (lead) story a larger headline than the rest of the feed', async () => {
+    mockNewsService.fetchAllNews.mockResolvedValue([
+      makeItem({ id: 'a', title: 'Lead story headline' }),
+      makeItem({ id: 'b', title: 'Second story headline', url: 'https://example.com/second' }),
+    ]);
+
+    render(<HomeScreen />);
+    await waitFor(() => screen.getByText('Second story headline'));
+
+    // Later entries in a React Native style array override earlier ones for
+    // the same key, so merge in array order rather than taking the first match.
+    const mergedStyle = (style: unknown) =>
+      Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
+
+    const leadFontSize = mergedStyle(screen.getByText('Lead story headline').props.style).fontSize;
+    const secondFontSize = mergedStyle(screen.getByText('Second story headline').props.style).fontSize;
+    expect(leadFontSize).toBeGreaterThan(secondFontSize);
+  });
+
   it('renders a fast source\'s articles immediately, before a slower source resolves', async () => {
     const fastItem = makeItem({ id: 'fast', title: 'Fast source headline', source: { name: 'BBC', type: 'rss' } });
     const slowItem = makeItem({ id: 'slow', title: 'Slow source headline', source: { name: 'NPR', type: 'rss' }, url: 'https://example.com/slow' });

@@ -61,4 +61,12 @@ describe('ArticleImage', () => {
 
     expect(containerHeight()).toBe(120);
   });
+
+  it('allows a taller clamp for the lead variant instead of capping at the default max', () => {
+    render(<ArticleImage uri="https://example.com/a.jpg" variant="lead" />);
+    layoutWith(350);
+    loadWith(300, 1200); // very tall - would clamp to 320 for the default variant
+
+    expect(containerHeight()).toBe(460);
+  });
 });
