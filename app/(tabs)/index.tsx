@@ -23,12 +23,22 @@ import { newsService } from '@/services/newsService';
 import { PreferenceBucket, preferencesService } from '@/services/preferencesService';
 import { AIExplanation, NewsItem } from '@/types/news';
 import { applyEngagementRanking } from '@/utils/engagementRanking';
+import { formatCount } from '@/utils/formatCount';
 import { logger } from '@/utils/logger';
 import { formatRelativeTime } from '@/utils/relativeTime';
 import { computeRelevanceTeaser } from '@/utils/relevanceTeaser';
 import { buildRelatedArticlesIndex } from '@/utils/storyClustering';
 
 const BRIEFING_STORY_COUNT = 5;
+// How many of the top-ranked stories sit under the "Top Stories" section
+// before the "More" section starts - purely a display split, doesn't
+// change applyEngagementRanking's ordering.
+const TOP_STORIES_COUNT = 3;
+
+type FeedRow =
+  | { type: 'header'; key: string; label: string }
+  | { type: 'article'; key: string; item: NewsItem; isLead: boolean };
+
 type BriefingState = 'idle' | 'loading' | 'speaking' | 'error';
 type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
 
@@ -102,6 +112,27 @@ export default function HomeScreen() {
     () => applyEngagementRanking(filteredNews, engagementScores),
     [filteredNews, engagementScores]
   );
+
+  // Splits the flat ranked list into "Top Stories" / "More" sections for
+  // display only - a synthetic row list is simpler here than switching
+  // FlatList to a SectionList, and keeps the single lead-card special case
+  // (first row) in one place.
+  const feedRows = useMemo<FeedRow[]>(() => {
+    if (rankedNews.length === 0) {
+      return [];
+    }
+    const rows: FeedRow[] = [{ type: 'header', key: 'header-top', label: 'Top Stories' }];
+    rankedNews.slice(0, TOP_STORIES_COUNT).forEach((item, i) => {
+      rows.push({ type: 'article', key: item.id, item, isLead: i === 0 });
+    });
+    if (rankedNews.length > TOP_STORIES_COUNT) {
+      rows.push({ type: 'header', key: 'header-more', label: 'More' });
+      rankedNews.slice(TOP_STORIES_COUNT).forEach(item => {
+        rows.push({ type: 'article', key: item.id, item, isLead: false });
+      });
+    }
+    return rows;
+  }, [rankedNews]);
 
   const loadNews = async (forceRefresh = false) => {
     try {
@@ -253,6 +284,31 @@ export default function HomeScreen() {
       return null;
     }
     return <ThemedText style={styles.leanTag}> • Source: {leanLabel}</ThemedText>;
+  };
+
+  // Only Reddit items carry score/commentCount (see newsService's Reddit
+  // parsing) - RSS items have neither, so this renders nothing for them
+  // rather than showing a partial/fake stat.
+  const renderEngagementStats = (item: NewsItem) => {
+    if (item.score === undefined && item.commentCount === undefined) {
+      return null;
+    }
+    return (
+      <View style={styles.engagementRow}>
+        {item.score !== undefined && (
+          <View style={styles.rowWithGap}>
+            <MaterialIcons name="arrow-upward" size={12} color={Colors[colorScheme].text} style={styles.engagementIcon} />
+            <Text style={styles.engagementText}>{formatCount(item.score)}</Text>
+          </View>
+        )}
+        {item.commentCount !== undefined && (
+          <View style={styles.rowWithGap}>
+            <MaterialIcons name="chat-bubble-outline" size={12} color={Colors[colorScheme].text} style={styles.engagementIcon} />
+            <Text style={styles.engagementText}>{formatCount(item.commentCount)}</Text>
+          </View>
+        )}
+      </View>
+    );
   };
 
   const renderComparisonPill = (item: NewsItem) => {
@@ -435,13 +491,16 @@ export default function HomeScreen() {
       )}
 
       <FlatList
-        data={rankedNews}
-        keyExtractor={(item) => item.id}
+        data={feedRows}
+        keyExtractor={(row) => row.key}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        renderItem={({ item, index }) => {
-          const isLead = index === 0;
+        renderItem={({ item: row }) => {
+          if (row.type === 'header') {
+            return <ThemedText style={styles.sectionHeader}>{row.label}</ThemedText>;
+          }
+          const { item, isLead } = row;
           return (
             <ThemedView style={styles.card}>
               <TouchableOpacity onPress={() => handleOpenArticle(item)}>
@@ -475,6 +534,7 @@ export default function HomeScreen() {
                 </View>
                 <IlluminateButton onPress={() => handleIlluminate(item)} />
               </ThemedView>
+              {renderEngagementStats(item)}
               {renderComparisonPill(item)}
             </ThemedView>
           );
@@ -585,6 +645,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     fontWeight: '300',
   },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    opacity: 0.5,
+    marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 8,
+  },
   card: {
     padding: 16,
     marginHorizontal: 16,
@@ -640,6 +710,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: AccentColor,
+  },
+  engagementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 12,
+  },
+  engagementIcon: {
+    opacity: 0.5,
+  },
+  engagementText: {
+    fontSize: 12,
+    opacity: 0.6,
   },
   comparisonRow: {
     marginTop: 10,

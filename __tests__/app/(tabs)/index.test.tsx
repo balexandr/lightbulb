@@ -590,6 +590,56 @@ describe('HomeScreen', () => {
     });
   });
 
+  describe('section headers', () => {
+    it('splits the feed into "Top Stories" and "More" sections', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ id: 'a', title: 'Story A' }),
+        makeItem({ id: 'b', title: 'Story B', url: 'https://example.com/b' }),
+        makeItem({ id: 'c', title: 'Story C', url: 'https://example.com/c' }),
+        makeItem({ id: 'd', title: 'Story D', url: 'https://example.com/d' }),
+      ]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('Story D'));
+
+      expect(screen.getByText('Top Stories')).toBeTruthy();
+      expect(screen.getByText('More')).toBeTruthy();
+    });
+
+    it('omits the "More" section when there are only enough stories for "Top Stories"', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+
+      expect(screen.getByText('Top Stories')).toBeTruthy();
+      expect(screen.queryByText('More')).toBeNull();
+    });
+  });
+
+  describe('engagement stats', () => {
+    it('shows upvote and comment counts for a Reddit item that has them', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([
+        makeItem({ source: { name: 'r/worldnews', type: 'reddit' }, score: 1500, commentCount: 342 }),
+      ]);
+
+      render(<HomeScreen />);
+
+      await waitFor(() => expect(screen.getByText('1.5k')).toBeTruthy());
+      expect(screen.getByText('342')).toBeTruthy();
+    });
+
+    it('shows no engagement stats for an RSS item, which has no score/commentCount', async () => {
+      mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
+
+      render(<HomeScreen />);
+      await waitFor(() => screen.getByText('A big headline'));
+
+      expect(screen.UNSAFE_queryByProps({ name: 'arrow-upward' })).toBeNull();
+      expect(screen.UNSAFE_queryByProps({ name: 'chat-bubble-outline' })).toBeNull();
+    });
+  });
+
   it('force-refreshes and clears the cache on pull-to-refresh', async () => {
     mockNewsService.fetchAllNews.mockResolvedValue([makeItem()]);
     render(<HomeScreen />);
