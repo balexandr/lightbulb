@@ -2,6 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Speech from 'expo-speech';
 import { ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArticleImage } from '@/components/ArticleImage';
 import { CoverageComparisonModal } from '@/components/CoverageComparisonModal';
@@ -86,6 +87,11 @@ export default function HomeScreen() {
   const explanationReadyAt = useRef<number | null>(null);
 
   const colorScheme = useColorScheme() ?? 'light';
+  // insets.top is the status bar/notch height - 0 on web and most Android,
+  // ~44-59 on a notched/Dynamic Island iPhone. Added on top of a fixed gap
+  // so the header sits right below it instead of either overlapping it or
+  // leaving a fixed 60px gap that's only correct for one specific device.
+  const insets = useSafeAreaInsets();
 
   // Stop any in-progress speech if the screen unmounts - otherwise audio
   // would keep playing after the user navigates away.
@@ -447,7 +453,12 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedView style={[styles.stickyHeader, { zIndex: filterMenuVisible ? 1001 : 1 }]}>
+      <ThemedView
+        style={[
+          styles.stickyHeader,
+          { paddingTop: insets.top + 12, zIndex: filterMenuVisible ? 1001 : 1 },
+        ]}
+      >
         <TouchableOpacity
           style={styles.hamburgerButton}
           onPress={handleToggleFilterMenu}
@@ -598,7 +609,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 20,
-    paddingTop: 24,
     paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(128, 128, 128, 0.2)',
