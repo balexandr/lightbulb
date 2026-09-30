@@ -5,7 +5,7 @@ before publishing, especially the liability/disclaimer sections and the
 governing-law placeholder. Fill in the bracketed placeholders before
 publishing.
 
-Last updated: [date] · Effective date: [date]
+Last updated: 2026-09-30 · Effective date: 2026-09-30
 
 ## 1. Acceptance of these terms
 
@@ -47,8 +47,8 @@ own terms and privacy policy, not ours.
 
 We link to and attribute every article's original publisher; we don't
 reproduce full article text. If you're a publisher and have concerns
-about how your content is presented in the App, contact us at [contact
-email].
+about how your content is presented in the App, contact us at
+bryanau@gmail.com.
 
 ## 6. Acceptable use
 
@@ -76,8 +76,8 @@ merchantability, fitness for a particular purpose, and non-infringement.
 
 ## 9. Limitation of liability
 
-To the maximum extent permitted by law, [your name / entity] is not
-liable for any indirect, incidental, special, consequential, or punitive
+To the maximum extent permitted by law, Bryan Alexander is not liable
+for any indirect, incidental, special, consequential, or punitive
 damages arising from your use of the App, including but not limited to
 reliance on any AI-generated explanation.
 
@@ -93,4 +93,4 @@ input].
 
 ## 12. Contact us
 
-Questions about these terms: [contact email]
+Questions about these terms: bryanau@gmail.com

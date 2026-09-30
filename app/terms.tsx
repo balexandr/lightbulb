@@ -10,7 +10,7 @@ export default function TermsOfServiceScreen() {
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <ThemedText type="title" style={styles.title}>Terms of Service</ThemedText>
-        <ThemedText style={styles.meta}>Last updated: [date]</ThemedText>
+        <ThemedText style={styles.meta}>Last updated: 2026-09-30</ThemedText>
 
         <ThemedText style={styles.paragraph}>
           By using Lightbulb (the &quot;App&quot;), you agree to these terms. If you don&apos;t
@@ -70,7 +70,7 @@ export default function TermsOfServiceScreen() {
 
         <ThemedText type="subtitle" style={styles.heading}>Contact us</ThemedText>
         <ThemedText style={styles.paragraph}>
-          Questions about these terms: [contact email]
+          Questions about these terms: bryanau@gmail.com
         </ThemedText>
       </ScrollView>
     </ThemedView>

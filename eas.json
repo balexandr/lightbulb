@@ -9,18 +9,33 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://lightbulb-20o9.onrender.com"
       }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://lightbulb-20o9.onrender.com"
+      }
+    },
+    "simulator": {
+      "extends": "preview",
+      "ios": {
+        "simulator": true
       }
     },
     "production": {
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://lightbulb-20o9.onrender.com"
       }
     }
   },

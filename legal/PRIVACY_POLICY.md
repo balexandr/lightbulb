@@ -6,12 +6,12 @@ actual attorney review it — especially the political-preference handling
 below — before publishing or submitting to an app store. Fill in the
 bracketed placeholders before publishing.
 
-Last updated: [date] · Effective date: [date]
+Last updated: 2026-09-30 · Effective date: 2026-09-30
 
 ## Who we are
 
-Lightbulb is developed by [your name / entity]. If you have questions
-about this policy or your data, contact us at [contact email].
+Lightbulb is developed by Bryan Alexander. If you have questions about
+this policy or your data, contact us at bryanau@gmail.com.
 
 ## No account required
 
@@ -145,4 +145,4 @@ before that change ships.
 
 ## Contact us
 
-Questions about this policy or your data: [contact email]
+Questions about this policy or your data: bryanau@gmail.com

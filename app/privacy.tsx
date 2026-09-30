@@ -13,7 +13,7 @@ export default function PrivacyPolicyScreen() {
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <ThemedText type="title" style={styles.title}>Privacy Policy</ThemedText>
-        <ThemedText style={styles.meta}>Last updated: [date]</ThemedText>
+        <ThemedText style={styles.meta}>Last updated: 2026-09-30</ThemedText>
 
         <ThemedText style={styles.paragraph}>
           Lightbulb doesn&apos;t require you to create an account, sign in, or provide your name,
@@ -80,7 +80,7 @@ export default function PrivacyPolicyScreen() {
 
         <ThemedText type="subtitle" style={styles.heading}>Contact us</ThemedText>
         <ThemedText style={styles.paragraph}>
-          Questions about this policy or your data: [contact email]
+          Questions about this policy or your data: bryanau@gmail.com
         </ThemedText>
       </ScrollView>
     </ThemedView>
